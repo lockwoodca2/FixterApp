@@ -1,0 +1,147 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  position: relative;
+}
+
+.header {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  background: #f8fafc;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.backButton:hover {
+  background: #2563eb;
+  color: white;
+  transform: translateX(-5px);
+}
+
+.title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1e293b;
+  margin-bottom: 5px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #64748b;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.toggleBtn {
+  padding: 8px 16px;
+  border: none;
+  background: #f8fafc;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.toggleBtn.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.loadingContainer,
+.emptyContainer {
+  padding: 60px 20px;
+  text-align: center;
+  color: #64748b;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.contractorsList {
+  display: grid;
+  gap: 16px;
+}
+
+.calendarView {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  min-height: 400px;
+}
+
+.calendarPlaceholder {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+}
+
+.floatingActionBar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 1160px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  border-radius: 10px;
+  padding: 15px 20px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.selectedText {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.actionButton {
+  background: #ff9900;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.actionButton:hover {
+  background: #e88a00;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 15px;
+  }
+  
+  .title {
+    font-size: 20px;
+  }
+  
+  .floatingActionBar {
+    padding: 12px 15px;
+  }
+}

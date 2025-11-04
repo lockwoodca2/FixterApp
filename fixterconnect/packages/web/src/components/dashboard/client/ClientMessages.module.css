@@ -1,0 +1,121 @@
+.messagesList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.messageCard {
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s;
+}
+
+.messageCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.messageCard.unread {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.messageCard.read {
+  border-left: 4px solid #e2e8f0;
+}
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.messageFrom {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+  color: #1e293b;
+}
+
+.messageInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.messageDate {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.unreadBadge {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.messageSubject,
+.messageContent {
+  color: #64748b;
+  margin: 5px 0;
+  font-size: 14px;
+}
+
+.messageActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.replyButton,
+.markReadButton {
+  padding: 6px 15px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.replyButton {
+  background: #2563eb;
+  color: white;
+}
+
+.markReadButton {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.actionButton {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.actionButton:hover {
+  background: #1d4ed8;
+  transform: translateY(-2px);
+}

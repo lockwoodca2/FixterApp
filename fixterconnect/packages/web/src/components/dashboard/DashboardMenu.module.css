@@ -1,0 +1,30 @@
+.menuContainer {
+  background: #f8fafc;
+  border-radius: 15px;
+  padding: 20px;
+  height: fit-content;
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.menuItem:hover {
+  background: #e2e8f0;
+}
+
+.menuItem.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}

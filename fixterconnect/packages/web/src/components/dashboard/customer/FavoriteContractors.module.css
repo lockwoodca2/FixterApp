@@ -1,0 +1,122 @@
+.contractorsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.contractorCard {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.contractorCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.contractorHeader {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.contractorAvatar {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.contractorInfo {
+  flex: 1;
+}
+
+.contractorName {
+  margin: 0 0 5px 0;
+  font-size: 18px;
+  color: #1e293b;
+}
+
+.contractorRating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #f59e0b;
+}
+
+.star {
+  line-height: 1;
+}
+
+.contractorServices {
+  margin-bottom: 15px;
+}
+
+.serviceTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.serviceTag {
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.contractorActions {
+  display: flex;
+  gap: 10px;
+}
+
+.requestButton,
+.messageButton {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.requestButton {
+  background: #2563eb;
+  color: white;
+}
+
+.messageButton {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.actionButton {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.actionButton:hover {
+  background: #1d4ed8;
+  transform: translateY(-2px);
+}
