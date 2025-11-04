@@ -5,7 +5,6 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "private": true,
-  "workspaces": ["fixterconnect/packages/*"],
   "dependencies": {
     "axios": "^1.12.2"
   },
@@ -15,7 +14,7 @@
   },
   "scripts": {
   "start": "react-scripts start",
-  "build:web": "npm run build --workspace=@fixterconnect/web",
+  "build": "react-scripts build",
   "test": "react-scripts test",
   "eject": "react-scripts eject"
 }
