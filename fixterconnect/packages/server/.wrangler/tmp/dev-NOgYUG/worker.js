@@ -11,6 +11,10 @@ var __esm = (fn, res) => function __init() {
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -8045,7 +8049,7 @@ var require_edge2 = __commonJS({
       },
       "inlineSchema": '// FixterConnect Database Schema\n// Using Prisma with Supabase PostgreSQL\n\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n// ============================================\n// USER & AUTH MODELS\n// ============================================\n\nmodel User {\n  id        Int      @id @default(autoincrement())\n  username  String   @unique\n  password  String // bcrypt hashed\n  type      UserType\n  createdAt DateTime @default(now()) @map("created_at")\n  updatedAt DateTime @updatedAt @map("updated_at")\n\n  // Relations\n  client     Client?\n  contractor Contractor?\n\n  @@map("users")\n}\n\nenum UserType {\n  CLIENT\n  CONTRACTOR\n  ADMIN\n}\n\n// ============================================\n// CLIENT MODEL\n// ============================================\n\nmodel Client {\n  id                Int       @id @default(autoincrement())\n  userId            Int       @unique @map("user_id")\n  firstName         String    @map("first_name")\n  lastName          String    @map("last_name")\n  email             String    @unique\n  phone             String\n  address           String?\n  city              String?\n  state             String?\n  zip               String?\n  notificationEmail Boolean   @default(true) @map("notification_email")\n  notificationSms   Boolean   @default(true) @map("notification_sms")\n  profilePicture    String?   @map("profile_picture")\n  isActive          Boolean   @default(true) @map("is_active")\n  isBanned          Boolean   @default(false) @map("is_banned")\n  suspendedUntil    DateTime? @map("suspended_until")\n  createdAt         DateTime  @default(now()) @map("created_at")\n  updatedAt         DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)\n  bookings        Booking[]\n  reviews         Review[]\n  messages        Message[]\n  flaggedMessages FlaggedMessage[]\n  favorites       FavoriteContractor[]\n\n  @@map("clients")\n}\n\n// ============================================\n// CONTRACTOR MODEL\n// ============================================\n\nmodel Contractor {\n  id                Int       @id @default(autoincrement())\n  userId            Int       @unique @map("user_id")\n  name              String\n  email             String?\n  phone             String?\n  description       String?   @db.Text\n  yearsInBusiness   Int?      @map("years_in_business")\n  location          String?\n  googleBusinessUrl String?   @map("google_business_url")\n  verified          Boolean   @default(false)\n  licensed          Boolean   @default(false)\n  rating            Float     @default(0)\n  reviewCount       Int       @default(0) @map("review_count")\n  profilePicture    String?   @map("profile_picture")\n  isActive          Boolean   @default(true) @map("is_active")\n  isBanned          Boolean   @default(false) @map("is_banned")\n  suspendedUntil    DateTime? @map("suspended_until")\n  createdAt         DateTime  @default(now()) @map("created_at")\n  updatedAt         DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)\n  services        ContractorService[]\n  bookings        Booking[]\n  reviews         Review[]\n  messages        Message[]\n  availability    Availability[]\n  serviceAreas    ContractorServiceArea[]\n  flaggedMessages FlaggedMessage[]\n  favoritedBy     FavoriteContractor[]\n\n  @@map("contractors")\n}\n\n// ============================================\n// SERVICES\n// ============================================\n\nmodel Service {\n  id          Int      @id @default(autoincrement())\n  name        String   @unique\n  icon        String\n  description String?  @db.Text\n  createdAt   DateTime @default(now()) @map("created_at")\n\n  // Relations\n  contractors ContractorService[]\n  bookings    Booking[]\n\n  @@map("services")\n}\n\nmodel ContractorService {\n  id           Int      @id @default(autoincrement())\n  contractorId Int      @map("contractor_id")\n  serviceId    Int      @map("service_id")\n  basePrice    Float?   @map("base_price")\n  createdAt    DateTime @default(now()) @map("created_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n  service    Service    @relation(fields: [serviceId], references: [id], onDelete: Cascade)\n\n  @@unique([contractorId, serviceId])\n  @@map("contractor_services")\n}\n\n// ============================================\n// BOOKINGS & JOBS\n// ============================================\n\nmodel Booking {\n  id                Int           @id @default(autoincrement())\n  contractorId      Int           @map("contractor_id")\n  clientId          Int           @map("client_id")\n  serviceId         Int           @map("service_id")\n  serviceAddress    String        @map("service_address")\n  scheduledDate     DateTime      @map("scheduled_date")\n  scheduledTime     String        @map("scheduled_time")\n  estimatedDuration Int?          @map("estimated_duration") // in minutes\n  status            BookingStatus @default(PENDING)\n  price             Float?\n  paymentReceived   Boolean       @default(false) @map("payment_received")\n  createdAt         DateTime      @default(now()) @map("created_at")\n  updatedAt         DateTime      @updatedAt @map("updated_at")\n\n  // Relations\n  contractor Contractor     @relation(fields: [contractorId], references: [id])\n  client     Client         @relation(fields: [clientId], references: [id])\n  service    Service        @relation(fields: [serviceId], references: [id])\n  completion JobCompletion?\n  photos     JobPhoto[]\n  invoice    Invoice?\n  payments   Payment[]\n\n  @@index([contractorId])\n  @@index([clientId])\n  @@index([scheduledDate])\n  @@index([contractorId, scheduledDate, status])\n  @@map("bookings")\n}\n\nenum BookingStatus {\n  PENDING\n  CONFIRMED\n  IN_PROGRESS\n  COMPLETED\n  CANCELLED\n}\n\nmodel JobCompletion {\n  id           Int       @id @default(autoincrement())\n  bookingId    Int       @unique @map("booking_id")\n  startTime    DateTime? @map("start_time")\n  endTime      DateTime? @map("end_time")\n  materials    String?   @db.Text\n  notes        String?   @db.Text\n  audioNoteUrl String?   @map("audio_note_url")\n  createdAt    DateTime  @default(now()) @map("created_at")\n  updatedAt    DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  @@map("job_completions")\n}\n\nmodel JobPhoto {\n  id           Int       @id @default(autoincrement())\n  bookingId    Int       @map("booking_id")\n  filename     String\n  originalName String    @map("original_name")\n  photoType    PhotoType @map("photo_type")\n  fileSize     Int       @map("file_size")\n  url          String\n  createdAt    DateTime  @default(now()) @map("created_at")\n\n  // Relations\n  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  @@index([bookingId])\n  @@map("job_photos")\n}\n\nenum PhotoType {\n  BEFORE\n  AFTER\n  ADDITIONAL\n}\n\n// ============================================\n// MESSAGING\n// ============================================\n\nmodel Message {\n  id           Int           @id @default(autoincrement())\n  contractorId Int           @map("contractor_id")\n  clientId     Int           @map("client_id")\n  subject      String?\n  status       MessageStatus @default(UNREAD)\n  createdAt    DateTime      @default(now()) @map("created_at")\n  updatedAt    DateTime      @updatedAt @map("updated_at")\n\n  // Relations\n  contractor   Contractor    @relation(fields: [contractorId], references: [id])\n  client       Client        @relation(fields: [clientId], references: [id])\n  chatMessages ChatMessage[]\n\n  @@index([contractorId])\n  @@index([clientId])\n  @@map("messages")\n}\n\nenum MessageStatus {\n  READ\n  UNREAD\n}\n\nmodel ChatMessage {\n  id          Int        @id @default(autoincrement())\n  messageId   Int        @map("message_id")\n  sender      SenderType\n  messageText String     @map("message_text") @db.Text\n  createdAt   DateTime   @default(now()) @map("created_at")\n\n  // Relations\n  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)\n\n  @@index([messageId])\n  @@map("chat_messages")\n}\n\nenum SenderType {\n  CONTRACTOR\n  CLIENT\n}\n\nmodel FlaggedMessage {\n  id           Int           @id @default(autoincrement())\n  messageId    Int?          @map("message_id")\n  messageText  String        @map("message_text") @db.Text\n  flaggedBy    FlaggedByType @map("flagged_by")\n  flaggedById  Int           @map("flagged_by_id")\n  contractorId Int?          @map("contractor_id")\n  clientId     Int?          @map("client_id")\n  reason       String\n  details      String?       @db.Text\n  status       FlagStatus    @default(PENDING)\n  reviewedBy   Int?          @map("reviewed_by")\n  reviewedAt   DateTime?     @map("reviewed_at")\n  createdAt    DateTime      @default(now()) @map("created_at")\n\n  // Relations\n  contractor Contractor? @relation(fields: [contractorId], references: [id])\n  client     Client?     @relation(fields: [clientId], references: [id])\n\n  @@index([status])\n  @@map("flagged_messages")\n}\n\nenum FlaggedByType {\n  CONTRACTOR\n  CLIENT\n}\n\nenum FlagStatus {\n  PENDING\n  REVIEWED\n  RESOLVED\n  DISMISSED\n}\n\n// ============================================\n// REVIEWS & RATINGS\n// ============================================\n\nmodel Review {\n  id           Int      @id @default(autoincrement())\n  contractorId Int      @map("contractor_id")\n  clientId     Int      @map("client_id")\n  rating       Int // 1-5 stars\n  reviewText   String?  @map("review_text") @db.Text\n  createdAt    DateTime @default(now()) @map("created_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id])\n  client     Client     @relation(fields: [clientId], references: [id])\n\n  @@index([contractorId])\n  @@map("reviews")\n}\n\n// ============================================\n// PAYMENTS & INVOICES\n// ============================================\n\nmodel Invoice {\n  id          Int           @id @default(autoincrement())\n  bookingId   Int           @unique @map("booking_id")\n  amount      Float\n  taxAmount   Float?        @map("tax_amount")\n  totalAmount Float         @map("total_amount")\n  status      InvoiceStatus @default(PENDING)\n  dueDate     DateTime?     @map("due_date")\n  paidAt      DateTime?     @map("paid_at")\n  createdAt   DateTime      @default(now()) @map("created_at")\n  updatedAt   DateTime      @updatedAt @map("updated_at")\n\n  // Relations\n  booking  Booking   @relation(fields: [bookingId], references: [id])\n  payments Payment[]\n\n  @@map("invoices")\n}\n\nenum InvoiceStatus {\n  PENDING\n  PAID\n  OVERDUE\n  CANCELLED\n}\n\nmodel Payment {\n  id                  Int           @id @default(autoincrement())\n  bookingId           Int           @map("booking_id")\n  invoiceId           Int?          @map("invoice_id")\n  amount              Float\n  paymentMethod       String        @map("payment_method")\n  stripePaymentId     String?       @unique @map("stripe_payment_id")\n  stripePaymentIntent String?       @unique @map("stripe_payment_intent")\n  status              PaymentStatus @default(PENDING)\n  paidAt              DateTime?     @map("paid_at")\n  createdAt           DateTime      @default(now()) @map("created_at")\n\n  // Relations\n  booking Booking  @relation(fields: [bookingId], references: [id])\n  invoice Invoice? @relation(fields: [invoiceId], references: [id])\n\n  @@index([bookingId])\n  @@map("payments")\n}\n\nenum PaymentStatus {\n  PENDING\n  PROCESSING\n  SUCCEEDED\n  FAILED\n  REFUNDED\n}\n\n// ============================================\n// CONTRACTOR AVAILABILITY\n// ============================================\n\n// General working hours for contractors (recurring schedule)\nmodel Availability {\n  id           Int       @id @default(autoincrement())\n  contractorId Int       @map("contractor_id")\n  dayOfWeek    Int?      @map("day_of_week") // 0=Sunday, 1=Monday, etc. NULL for specific dates\n  specificDate DateTime? @map("specific_date") // For one-time overrides (vacation, holidays)\n  startTime    String    @map("start_time") // e.g., "08:00"\n  endTime      String    @map("end_time") // e.g., "17:00"\n  maxBookings  Int       @default(8) @map("max_bookings") // Max jobs per day\n  isAvailable  Boolean   @default(true) @map("is_available")\n  isRecurring  Boolean   @default(true) @map("is_recurring") // true = recurring weekly, false = specific date\n  createdAt    DateTime  @default(now()) @map("created_at")\n  updatedAt    DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n\n  @@index([contractorId, dayOfWeek])\n  @@index([contractorId, specificDate])\n  @@map("availability")\n}\n\n// ============================================\n// SERVICE AREAS\n// ============================================\n\n// Tracks which areas a contractor serves on which days\nmodel ContractorServiceArea {\n  id           Int      @id @default(autoincrement())\n  contractorId Int      @map("contractor_id")\n  dayOfWeek    Int?     @map("day_of_week") // 0=Sunday, 1=Monday, etc. NULL = all days\n  area         String // City/area name (e.g., "Boise", "Nampa")\n  isActive     Boolean  @default(true) @map("is_active")\n  createdAt    DateTime @default(now()) @map("created_at")\n  updatedAt    DateTime @updatedAt @map("updated_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n\n  @@index([contractorId, dayOfWeek])\n  @@index([area])\n  @@map("contractor_service_areas")\n}\n\n// ============================================\n// FAVORITE CONTRACTORS\n// ============================================\n\nmodel FavoriteContractor {\n  id           Int      @id @default(autoincrement())\n  clientId     Int      @map("client_id")\n  contractorId Int      @map("contractor_id")\n  createdAt    DateTime @default(now()) @map("created_at")\n\n  // Relations\n  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n\n  @@unique([clientId, contractorId])\n  @@index([clientId])\n  @@map("favorite_contractors")\n}\n\n// ============================================\n// ADMIN ACTIVITY LOGS\n// ============================================\n\nenum ActivitySeverity {\n  LOW\n  MEDIUM\n  HIGH\n}\n\nmodel ActivityLog {\n  id        Int              @id @default(autoincrement())\n  userId    Int?             @map("user_id") // Admin user who performed the action\n  action    String // e.g., "Flag Dismissed", "User Suspended", "User Banned"\n  details   String           @db.Text // Full description of what happened\n  severity  ActivitySeverity @default(LOW)\n  metadata  Json? // Additional structured data (user IDs, flag IDs, etc.)\n  createdAt DateTime         @default(now()) @map("created_at")\n\n  @@index([createdAt])\n  @@index([severity])\n  @@map("activity_logs")\n}\n',
       "inlineSchemaHash": "8f2ccfe64660c30850b8766ba153e675908e822190d83a352cf22d905a0361c6",
-      "copyEngine": false
+      "copyEngine": true
     };
     config2.dirname = "/";
     config2.runtimeDataModel = JSON.parse('{"models":{"User":{"dbName":"users","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"username","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"password","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"type","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"UserType","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"client","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Client","nativeType":null,"relationName":"ClientToUser","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"contractor","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToUser","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Client":{"dbName":"clients","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"userId","dbName":"user_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"firstName","dbName":"first_name","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"lastName","dbName":"last_name","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"email","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"phone","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"address","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"city","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"state","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"zip","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"notificationEmail","dbName":"notification_email","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"notificationSms","dbName":"notification_sms","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"profilePicture","dbName":"profile_picture","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"isActive","dbName":"is_active","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"isBanned","dbName":"is_banned","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":false,"isGenerated":false,"isUpdatedAt":false},{"name":"suspendedUntil","dbName":"suspended_until","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"user","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"User","nativeType":null,"relationName":"ClientToUser","relationFromFields":["userId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false},{"name":"bookings","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToClient","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"reviews","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Review","nativeType":null,"relationName":"ClientToReview","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"messages","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Message","nativeType":null,"relationName":"ClientToMessage","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"flaggedMessages","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"FlaggedMessage","nativeType":null,"relationName":"ClientToFlaggedMessage","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"favorites","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"FavoriteContractor","nativeType":null,"relationName":"ClientToFavoriteContractor","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Contractor":{"dbName":"contractors","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"userId","dbName":"user_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"name","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"email","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"phone","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"description","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"yearsInBusiness","dbName":"years_in_business","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"location","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"googleBusinessUrl","dbName":"google_business_url","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"verified","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":false,"isGenerated":false,"isUpdatedAt":false},{"name":"licensed","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":false,"isGenerated":false,"isUpdatedAt":false},{"name":"rating","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Float","nativeType":null,"default":0,"isGenerated":false,"isUpdatedAt":false},{"name":"reviewCount","dbName":"review_count","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":0,"isGenerated":false,"isUpdatedAt":false},{"name":"profilePicture","dbName":"profile_picture","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"isActive","dbName":"is_active","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"isBanned","dbName":"is_banned","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":false,"isGenerated":false,"isUpdatedAt":false},{"name":"suspendedUntil","dbName":"suspended_until","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"user","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"User","nativeType":null,"relationName":"ContractorToUser","relationFromFields":["userId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false},{"name":"services","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"ContractorService","nativeType":null,"relationName":"ContractorToContractorService","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"bookings","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToContractor","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"reviews","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Review","nativeType":null,"relationName":"ContractorToReview","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"messages","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Message","nativeType":null,"relationName":"ContractorToMessage","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"availability","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Availability","nativeType":null,"relationName":"AvailabilityToContractor","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"serviceAreas","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"ContractorServiceArea","nativeType":null,"relationName":"ContractorToContractorServiceArea","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"flaggedMessages","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"FlaggedMessage","nativeType":null,"relationName":"ContractorToFlaggedMessage","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"favoritedBy","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"FavoriteContractor","nativeType":null,"relationName":"ContractorToFavoriteContractor","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Service":{"dbName":"services","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"name","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"icon","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"description","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractors","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"ContractorService","nativeType":null,"relationName":"ContractorServiceToService","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"bookings","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToService","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"ContractorService":{"dbName":"contractor_services","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"serviceId","dbName":"service_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"basePrice","dbName":"base_price","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Float","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToContractorService","relationFromFields":["contractorId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false},{"name":"service","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Service","nativeType":null,"relationName":"ContractorServiceToService","relationFromFields":["serviceId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[["contractorId","serviceId"]],"uniqueIndexes":[{"name":null,"fields":["contractorId","serviceId"]}],"isGenerated":false},"Booking":{"dbName":"bookings","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"clientId","dbName":"client_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"serviceId","dbName":"service_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"serviceAddress","dbName":"service_address","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"scheduledDate","dbName":"scheduled_date","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"scheduledTime","dbName":"scheduled_time","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"estimatedDuration","dbName":"estimated_duration","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"status","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"BookingStatus","nativeType":null,"default":"PENDING","isGenerated":false,"isUpdatedAt":false},{"name":"price","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Float","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"paymentReceived","dbName":"payment_received","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":false,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"BookingToContractor","relationFromFields":["contractorId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"client","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Client","nativeType":null,"relationName":"BookingToClient","relationFromFields":["clientId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"service","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Service","nativeType":null,"relationName":"BookingToService","relationFromFields":["serviceId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"completion","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"JobCompletion","nativeType":null,"relationName":"BookingToJobCompletion","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"photos","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"JobPhoto","nativeType":null,"relationName":"BookingToJobPhoto","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"invoice","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Invoice","nativeType":null,"relationName":"BookingToInvoice","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false},{"name":"payments","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Payment","nativeType":null,"relationName":"BookingToPayment","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"JobCompletion":{"dbName":"job_completions","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"bookingId","dbName":"booking_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"startTime","dbName":"start_time","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"endTime","dbName":"end_time","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"materials","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"notes","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"audioNoteUrl","dbName":"audio_note_url","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"booking","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToJobCompletion","relationFromFields":["bookingId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"JobPhoto":{"dbName":"job_photos","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"bookingId","dbName":"booking_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"filename","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"originalName","dbName":"original_name","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"photoType","dbName":"photo_type","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"PhotoType","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"fileSize","dbName":"file_size","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"url","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"booking","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToJobPhoto","relationFromFields":["bookingId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Message":{"dbName":"messages","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"clientId","dbName":"client_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"subject","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"status","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"MessageStatus","nativeType":null,"default":"UNREAD","isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToMessage","relationFromFields":["contractorId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"client","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Client","nativeType":null,"relationName":"ClientToMessage","relationFromFields":["clientId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"chatMessages","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"ChatMessage","nativeType":null,"relationName":"ChatMessageToMessage","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"ChatMessage":{"dbName":"chat_messages","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"messageId","dbName":"message_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"sender","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"SenderType","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"messageText","dbName":"message_text","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"message","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Message","nativeType":null,"relationName":"ChatMessageToMessage","relationFromFields":["messageId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"FlaggedMessage":{"dbName":"flagged_messages","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"messageId","dbName":"message_id","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"messageText","dbName":"message_text","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"flaggedBy","dbName":"flagged_by","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"FlaggedByType","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"flaggedById","dbName":"flagged_by_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"clientId","dbName":"client_id","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"reason","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"details","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"status","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"FlagStatus","nativeType":null,"default":"PENDING","isGenerated":false,"isUpdatedAt":false},{"name":"reviewedBy","dbName":"reviewed_by","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"reviewedAt","dbName":"reviewed_at","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractor","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToFlaggedMessage","relationFromFields":["contractorId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"client","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Client","nativeType":null,"relationName":"ClientToFlaggedMessage","relationFromFields":["clientId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Review":{"dbName":"reviews","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"clientId","dbName":"client_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"rating","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"reviewText","dbName":"review_text","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToReview","relationFromFields":["contractorId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"client","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Client","nativeType":null,"relationName":"ClientToReview","relationFromFields":["clientId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Invoice":{"dbName":"invoices","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"bookingId","dbName":"booking_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":true,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"amount","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Float","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"taxAmount","dbName":"tax_amount","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Float","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"totalAmount","dbName":"total_amount","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Float","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"status","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"InvoiceStatus","nativeType":null,"default":"PENDING","isGenerated":false,"isUpdatedAt":false},{"name":"dueDate","dbName":"due_date","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"paidAt","dbName":"paid_at","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"booking","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToInvoice","relationFromFields":["bookingId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"payments","kind":"object","isList":true,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Payment","nativeType":null,"relationName":"InvoiceToPayment","relationFromFields":[],"relationToFields":[],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Payment":{"dbName":"payments","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"bookingId","dbName":"booking_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"invoiceId","dbName":"invoice_id","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"amount","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Float","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"paymentMethod","dbName":"payment_method","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"stripePaymentId","dbName":"stripe_payment_id","kind":"scalar","isList":false,"isRequired":false,"isUnique":true,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"stripePaymentIntent","dbName":"stripe_payment_intent","kind":"scalar","isList":false,"isRequired":false,"isUnique":true,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"status","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"PaymentStatus","nativeType":null,"default":"PENDING","isGenerated":false,"isUpdatedAt":false},{"name":"paidAt","dbName":"paid_at","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"booking","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Booking","nativeType":null,"relationName":"BookingToPayment","relationFromFields":["bookingId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false},{"name":"invoice","kind":"object","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Invoice","nativeType":null,"relationName":"InvoiceToPayment","relationFromFields":["invoiceId"],"relationToFields":["id"],"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"Availability":{"dbName":"availability","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"dayOfWeek","dbName":"day_of_week","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"specificDate","dbName":"specific_date","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"startTime","dbName":"start_time","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"endTime","dbName":"end_time","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"maxBookings","dbName":"max_bookings","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":8,"isGenerated":false,"isUpdatedAt":false},{"name":"isAvailable","dbName":"is_available","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"isRecurring","dbName":"is_recurring","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"AvailabilityToContractor","relationFromFields":["contractorId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"ContractorServiceArea":{"dbName":"contractor_service_areas","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"dayOfWeek","dbName":"day_of_week","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"area","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"isActive","dbName":"is_active","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"Boolean","nativeType":null,"default":true,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"updatedAt","dbName":"updated_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"DateTime","nativeType":null,"isGenerated":false,"isUpdatedAt":true},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToContractorServiceArea","relationFromFields":["contractorId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false},"FavoriteContractor":{"dbName":"favorite_contractors","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"clientId","dbName":"client_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"contractorId","dbName":"contractor_id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":true,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"client","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Client","nativeType":null,"relationName":"ClientToFavoriteContractor","relationFromFields":["clientId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false},{"name":"contractor","kind":"object","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Contractor","nativeType":null,"relationName":"ContractorToFavoriteContractor","relationFromFields":["contractorId"],"relationToFields":["id"],"relationOnDelete":"Cascade","isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[["clientId","contractorId"]],"uniqueIndexes":[{"name":null,"fields":["clientId","contractorId"]}],"isGenerated":false},"ActivityLog":{"dbName":"activity_logs","schema":null,"fields":[{"name":"id","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":true,"isReadOnly":false,"hasDefaultValue":true,"type":"Int","nativeType":null,"default":{"name":"autoincrement","args":[]},"isGenerated":false,"isUpdatedAt":false},{"name":"userId","dbName":"user_id","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Int","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"action","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"details","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"String","nativeType":["Text",[]],"isGenerated":false,"isUpdatedAt":false},{"name":"severity","kind":"enum","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"ActivitySeverity","nativeType":null,"default":"LOW","isGenerated":false,"isUpdatedAt":false},{"name":"metadata","kind":"scalar","isList":false,"isRequired":false,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":false,"type":"Json","nativeType":null,"isGenerated":false,"isUpdatedAt":false},{"name":"createdAt","dbName":"created_at","kind":"scalar","isList":false,"isRequired":true,"isUnique":false,"isId":false,"isReadOnly":false,"hasDefaultValue":true,"type":"DateTime","nativeType":null,"default":{"name":"now","args":[]},"isGenerated":false,"isUpdatedAt":false}],"primaryKey":null,"uniqueFields":[],"uniqueIndexes":[],"isGenerated":false}},"enums":{"UserType":{"values":[{"name":"CLIENT","dbName":null},{"name":"CONTRACTOR","dbName":null},{"name":"ADMIN","dbName":null}],"dbName":null},"BookingStatus":{"values":[{"name":"PENDING","dbName":null},{"name":"CONFIRMED","dbName":null},{"name":"IN_PROGRESS","dbName":null},{"name":"COMPLETED","dbName":null},{"name":"CANCELLED","dbName":null}],"dbName":null},"PhotoType":{"values":[{"name":"BEFORE","dbName":null},{"name":"AFTER","dbName":null},{"name":"ADDITIONAL","dbName":null}],"dbName":null},"MessageStatus":{"values":[{"name":"READ","dbName":null},{"name":"UNREAD","dbName":null}],"dbName":null},"SenderType":{"values":[{"name":"CONTRACTOR","dbName":null},{"name":"CLIENT","dbName":null}],"dbName":null},"FlaggedByType":{"values":[{"name":"CONTRACTOR","dbName":null},{"name":"CLIENT","dbName":null}],"dbName":null},"FlagStatus":{"values":[{"name":"PENDING","dbName":null},{"name":"REVIEWED","dbName":null},{"name":"RESOLVED","dbName":null},{"name":"DISMISSED","dbName":null}],"dbName":null},"InvoiceStatus":{"values":[{"name":"PENDING","dbName":null},{"name":"PAID","dbName":null},{"name":"OVERDUE","dbName":null},{"name":"CANCELLED","dbName":null}],"dbName":null},"PaymentStatus":{"values":[{"name":"PENDING","dbName":null},{"name":"PROCESSING","dbName":null},{"name":"SUCCEEDED","dbName":null},{"name":"FAILED","dbName":null},{"name":"REFUNDED","dbName":null}],"dbName":null},"ActivitySeverity":{"values":[{"name":"LOW","dbName":null},{"name":"MEDIUM","dbName":null},{"name":"HIGH","dbName":null}],"dbName":null}},"types":{}}');
@@ -8092,7 +8096,7 @@ var require_default_index = __commonJS({
     var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
     var __getOwnPropNames2 = Object.getOwnPropertyNames;
     var __hasOwnProp2 = Object.prototype.hasOwnProperty;
-    var __export = /* @__PURE__ */ __name((target, all) => {
+    var __export2 = /* @__PURE__ */ __name((target, all) => {
       for (var name in all)
         __defProp2(target, name, { get: all[name], enumerable: true });
     }, "__export");
@@ -8106,7 +8110,7 @@ var require_default_index = __commonJS({
     }, "__copyProps");
     var __toCommonJS = /* @__PURE__ */ __name((mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod), "__toCommonJS");
     var default_index_exports = {};
-    __export(default_index_exports, {
+    __export2(default_index_exports, {
       Prisma: /* @__PURE__ */ __name(() => Prisma, "Prisma"),
       PrismaClient: /* @__PURE__ */ __name(() => PrismaClient2, "PrismaClient"),
       default: /* @__PURE__ */ __name(() => default_index_default, "default")
@@ -13343,6 +13347,680 @@ ${n}`;
   }
 });
 
+// ../../node_modules/.prisma/client/query_engine_bg.js
+var require_query_engine_bg = __commonJS({
+  "../../node_modules/.prisma/client/query_engine_bg.js"(exports, module) {
+    "use strict";
+    init_modules_watch_stub();
+    init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
+    init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
+    init_performance2();
+    var S2 = Object.defineProperty;
+    var k2 = Object.getOwnPropertyDescriptor;
+    var D = Object.getOwnPropertyNames;
+    var R = Object.prototype.hasOwnProperty;
+    var B = /* @__PURE__ */ __name((e, t) => {
+      for (var n in t) S2(e, n, { get: t[n], enumerable: true });
+    }, "B");
+    var U = /* @__PURE__ */ __name((e, t, n, r) => {
+      if (t && typeof t == "object" || typeof t == "function") for (let _ of D(t)) !R.call(e, _) && _ !== n && S2(e, _, { get: /* @__PURE__ */ __name(() => t[_], "get"), enumerable: !(r = k2(t, _)) || r.enumerable });
+      return e;
+    }, "U");
+    var L = /* @__PURE__ */ __name((e) => U(S2({}, "__esModule", { value: true }), e), "L");
+    var Ft = {};
+    B(Ft, { QueryEngine: /* @__PURE__ */ __name(() => Q, "QueryEngine"), __wbg_String_8f0eb39a4a4c2f66: /* @__PURE__ */ __name(() => H, "__wbg_String_8f0eb39a4a4c2f66"), __wbg_buffer_609cc3eee51ed158: /* @__PURE__ */ __name(() => J, "__wbg_buffer_609cc3eee51ed158"), __wbg_call_672a4d21634d4a24: /* @__PURE__ */ __name(() => K, "__wbg_call_672a4d21634d4a24"), __wbg_call_7cccdd69e0791ae2: /* @__PURE__ */ __name(() => X, "__wbg_call_7cccdd69e0791ae2"), __wbg_crypto_805be4ce92f1e370: /* @__PURE__ */ __name(() => Y, "__wbg_crypto_805be4ce92f1e370"), __wbg_done_769e5ede4b31c67b: /* @__PURE__ */ __name(() => Z, "__wbg_done_769e5ede4b31c67b"), __wbg_entries_3265d4158b33e5dc: /* @__PURE__ */ __name(() => ee, "__wbg_entries_3265d4158b33e5dc"), __wbg_exec_3e2d2d0644c927df: /* @__PURE__ */ __name(() => te, "__wbg_exec_3e2d2d0644c927df"), __wbg_getRandomValues_f6a868620c8bab49: /* @__PURE__ */ __name(() => ne, "__wbg_getRandomValues_f6a868620c8bab49"), __wbg_getTime_46267b1c24877e30: /* @__PURE__ */ __name(() => re, "__wbg_getTime_46267b1c24877e30"), __wbg_get_67b2ba62fc30de12: /* @__PURE__ */ __name(() => oe, "__wbg_get_67b2ba62fc30de12"), __wbg_get_b9b93047fe3cf45b: /* @__PURE__ */ __name(() => _e, "__wbg_get_b9b93047fe3cf45b"), __wbg_get_ece95cf6585650d9: /* @__PURE__ */ __name(() => ce, "__wbg_get_ece95cf6585650d9"), __wbg_getwithrefkey_1dc361bd10053bfe: /* @__PURE__ */ __name(() => ie, "__wbg_getwithrefkey_1dc361bd10053bfe"), __wbg_has_a5ea9117f258a0ec: /* @__PURE__ */ __name(() => ue, "__wbg_has_a5ea9117f258a0ec"), __wbg_instanceof_ArrayBuffer_e14585432e3737fc: /* @__PURE__ */ __name(() => se, "__wbg_instanceof_ArrayBuffer_e14585432e3737fc"), __wbg_instanceof_Map_f3469ce2244d2430: /* @__PURE__ */ __name(() => fe, "__wbg_instanceof_Map_f3469ce2244d2430"), __wbg_instanceof_Promise_935168b8f4b49db3: /* @__PURE__ */ __name(() => ae, "__wbg_instanceof_Promise_935168b8f4b49db3"), __wbg_instanceof_Uint8Array_17156bcf118086a9: /* @__PURE__ */ __name(() => be, "__wbg_instanceof_Uint8Array_17156bcf118086a9"), __wbg_isArray_a1eab7e0d067391b: /* @__PURE__ */ __name(() => ge, "__wbg_isArray_a1eab7e0d067391b"), __wbg_isSafeInteger_343e2beeeece1bb0: /* @__PURE__ */ __name(() => le, "__wbg_isSafeInteger_343e2beeeece1bb0"), __wbg_iterator_9a24c88df860dc65: /* @__PURE__ */ __name(() => de, "__wbg_iterator_9a24c88df860dc65"), __wbg_keys_5c77a08ddc2fb8a6: /* @__PURE__ */ __name(() => we, "__wbg_keys_5c77a08ddc2fb8a6"), __wbg_length_a446193dc22c12f8: /* @__PURE__ */ __name(() => pe, "__wbg_length_a446193dc22c12f8"), __wbg_length_e2d2a49132c1b256: /* @__PURE__ */ __name(() => xe, "__wbg_length_e2d2a49132c1b256"), __wbg_msCrypto_2ac4d17c4748234a: /* @__PURE__ */ __name(() => ye, "__wbg_msCrypto_2ac4d17c4748234a"), __wbg_new0_f788a2397c7ca929: /* @__PURE__ */ __name(() => me, "__wbg_new0_f788a2397c7ca929"), __wbg_new_23a2665fac83c611: /* @__PURE__ */ __name(() => he, "__wbg_new_23a2665fac83c611"), __wbg_new_405e22f390576ce2: /* @__PURE__ */ __name(() => Te, "__wbg_new_405e22f390576ce2"), __wbg_new_5e0be73521bc8c17: /* @__PURE__ */ __name(() => qe, "__wbg_new_5e0be73521bc8c17"), __wbg_new_63847613cde5d4bc: /* @__PURE__ */ __name(() => Se, "__wbg_new_63847613cde5d4bc"), __wbg_new_78feb108b6472713: /* @__PURE__ */ __name(() => Ae, "__wbg_new_78feb108b6472713"), __wbg_new_a12002a7f91c75be: /* @__PURE__ */ __name(() => Ie, "__wbg_new_a12002a7f91c75be"), __wbg_newnoargs_105ed471475aaf50: /* @__PURE__ */ __name(() => Ee, "__wbg_newnoargs_105ed471475aaf50"), __wbg_newwithbyteoffsetandlength_d97e637ebe145a9a: /* @__PURE__ */ __name(() => Oe, "__wbg_newwithbyteoffsetandlength_d97e637ebe145a9a"), __wbg_newwithlength_a381634e90c276d4: /* @__PURE__ */ __name(() => Fe, "__wbg_newwithlength_a381634e90c276d4"), __wbg_next_25feadfc0913fea9: /* @__PURE__ */ __name(() => Me, "__wbg_next_25feadfc0913fea9"), __wbg_next_6574e1a8a62d1055: /* @__PURE__ */ __name(() => je, "__wbg_next_6574e1a8a62d1055"), __wbg_node_ecc8306b9857f33d: /* @__PURE__ */ __name(() => ke, "__wbg_node_ecc8306b9857f33d"), __wbg_now_7fd00a794a07d388: /* @__PURE__ */ __name(() => De, "__wbg_now_7fd00a794a07d388"), __wbg_now_807e54c39636c349: /* @__PURE__ */ __name(() => Re, "__wbg_now_807e54c39636c349"), __wbg_now_b3f7572f6ef3d3a9: /* @__PURE__ */ __name(() => Be, "__wbg_now_b3f7572f6ef3d3a9"), __wbg_process_5cff2739921be718: /* @__PURE__ */ __name(() => Ue, "__wbg_process_5cff2739921be718"), __wbg_push_737cfc8c1432c2c6: /* @__PURE__ */ __name(() => Le, "__wbg_push_737cfc8c1432c2c6"), __wbg_queueMicrotask_5a8a9131f3f0b37b: /* @__PURE__ */ __name(() => ve, "__wbg_queueMicrotask_5a8a9131f3f0b37b"), __wbg_queueMicrotask_6d79674585219521: /* @__PURE__ */ __name(() => Ne, "__wbg_queueMicrotask_6d79674585219521"), __wbg_randomFillSync_d3c85af7e31cf1f8: /* @__PURE__ */ __name(() => $e, "__wbg_randomFillSync_d3c85af7e31cf1f8"), __wbg_require_0c566c6f2eef6c79: /* @__PURE__ */ __name(() => Ce, "__wbg_require_0c566c6f2eef6c79"), __wbg_resolve_4851785c9c5f573d: /* @__PURE__ */ __name(() => Ve, "__wbg_resolve_4851785c9c5f573d"), __wbg_setTimeout_5d6a1d4fc51ea450: /* @__PURE__ */ __name(() => ze, "__wbg_setTimeout_5d6a1d4fc51ea450"), __wbg_set_37837023f3d740e8: /* @__PURE__ */ __name(() => We, "__wbg_set_37837023f3d740e8"), __wbg_set_3f1d0b984ed272ed: /* @__PURE__ */ __name(() => Pe, "__wbg_set_3f1d0b984ed272ed"), __wbg_set_65595bdd868b3009: /* @__PURE__ */ __name(() => Ge, "__wbg_set_65595bdd868b3009"), __wbg_set_8fc6bf8a5b1071d1: /* @__PURE__ */ __name(() => Qe, "__wbg_set_8fc6bf8a5b1071d1"), __wbg_set_bb8cecf6a62b9f46: /* @__PURE__ */ __name(() => He, "__wbg_set_bb8cecf6a62b9f46"), __wbg_set_wasm: /* @__PURE__ */ __name(() => v, "__wbg_set_wasm"), __wbg_static_accessor_GLOBAL_88a902d13a557d07: /* @__PURE__ */ __name(() => Je, "__wbg_static_accessor_GLOBAL_88a902d13a557d07"), __wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0: /* @__PURE__ */ __name(() => Ke, "__wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0"), __wbg_static_accessor_SELF_37c5d418e4bf5819: /* @__PURE__ */ __name(() => Xe, "__wbg_static_accessor_SELF_37c5d418e4bf5819"), __wbg_static_accessor_WINDOW_5de37043a91a9c40: /* @__PURE__ */ __name(() => Ye, "__wbg_static_accessor_WINDOW_5de37043a91a9c40"), __wbg_subarray_aa9065fa9dc5df96: /* @__PURE__ */ __name(() => Ze, "__wbg_subarray_aa9065fa9dc5df96"), __wbg_then_44b73946d2fb3e7d: /* @__PURE__ */ __name(() => et, "__wbg_then_44b73946d2fb3e7d"), __wbg_then_48b406749878a531: /* @__PURE__ */ __name(() => tt, "__wbg_then_48b406749878a531"), __wbg_valueOf_7392193dd78c6b97: /* @__PURE__ */ __name(() => nt, "__wbg_valueOf_7392193dd78c6b97"), __wbg_value_cd1ffa7b1ab794f1: /* @__PURE__ */ __name(() => rt, "__wbg_value_cd1ffa7b1ab794f1"), __wbg_versions_a8e5a362e1f16442: /* @__PURE__ */ __name(() => ot, "__wbg_versions_a8e5a362e1f16442"), __wbindgen_as_number: /* @__PURE__ */ __name(() => _t, "__wbindgen_as_number"), __wbindgen_bigint_from_i64: /* @__PURE__ */ __name(() => ct, "__wbindgen_bigint_from_i64"), __wbindgen_bigint_from_u64: /* @__PURE__ */ __name(() => it, "__wbindgen_bigint_from_u64"), __wbindgen_bigint_get_as_i64: /* @__PURE__ */ __name(() => ut, "__wbindgen_bigint_get_as_i64"), __wbindgen_boolean_get: /* @__PURE__ */ __name(() => st, "__wbindgen_boolean_get"), __wbindgen_cb_drop: /* @__PURE__ */ __name(() => ft, "__wbindgen_cb_drop"), __wbindgen_closure_wrapper7715: /* @__PURE__ */ __name(() => at, "__wbindgen_closure_wrapper7715"), __wbindgen_debug_string: /* @__PURE__ */ __name(() => bt, "__wbindgen_debug_string"), __wbindgen_error_new: /* @__PURE__ */ __name(() => gt, "__wbindgen_error_new"), __wbindgen_in: /* @__PURE__ */ __name(() => lt, "__wbindgen_in"), __wbindgen_init_externref_table: /* @__PURE__ */ __name(() => dt, "__wbindgen_init_externref_table"), __wbindgen_is_bigint: /* @__PURE__ */ __name(() => wt, "__wbindgen_is_bigint"), __wbindgen_is_function: /* @__PURE__ */ __name(() => pt, "__wbindgen_is_function"), __wbindgen_is_object: /* @__PURE__ */ __name(() => xt, "__wbindgen_is_object"), __wbindgen_is_string: /* @__PURE__ */ __name(() => yt, "__wbindgen_is_string"), __wbindgen_is_undefined: /* @__PURE__ */ __name(() => mt, "__wbindgen_is_undefined"), __wbindgen_jsval_eq: /* @__PURE__ */ __name(() => ht, "__wbindgen_jsval_eq"), __wbindgen_jsval_loose_eq: /* @__PURE__ */ __name(() => Tt, "__wbindgen_jsval_loose_eq"), __wbindgen_memory: /* @__PURE__ */ __name(() => qt, "__wbindgen_memory"), __wbindgen_number_get: /* @__PURE__ */ __name(() => St, "__wbindgen_number_get"), __wbindgen_number_new: /* @__PURE__ */ __name(() => At, "__wbindgen_number_new"), __wbindgen_string_get: /* @__PURE__ */ __name(() => It, "__wbindgen_string_get"), __wbindgen_string_new: /* @__PURE__ */ __name(() => Et, "__wbindgen_string_new"), __wbindgen_throw: /* @__PURE__ */ __name(() => Ot, "__wbindgen_throw"), debug_panic: /* @__PURE__ */ __name(() => z, "debug_panic"), getBuildTimeInfo: /* @__PURE__ */ __name(() => W, "getBuildTimeInfo") });
+    module.exports = L(Ft);
+    var m = /* @__PURE__ */ __name(() => {
+    }, "m");
+    m.prototype = m;
+    var o;
+    function v(e) {
+      o = e;
+    }
+    __name(v, "v");
+    var s = 0;
+    var h = null;
+    function T2() {
+      return (h === null || h.byteLength === 0) && (h = new Uint8Array(o.memory.buffer)), h;
+    }
+    __name(T2, "T");
+    var N = typeof TextEncoder > "u" ? (0, module.require)("util").TextEncoder : TextEncoder;
+    var q = new N("utf-8");
+    var $ = typeof q.encodeInto == "function" ? function(e, t) {
+      return q.encodeInto(e, t);
+    } : function(e, t) {
+      const n = q.encode(e);
+      return t.set(n), { read: e.length, written: n.length };
+    };
+    function f2(e, t, n) {
+      if (n === void 0) {
+        const u = q.encode(e), a = t(u.length, 1) >>> 0;
+        return T2().subarray(a, a + u.length).set(u), s = u.length, a;
+      }
+      let r = e.length, _ = t(r, 1) >>> 0;
+      const i = T2();
+      let c = 0;
+      for (; c < r; c++) {
+        const u = e.charCodeAt(c);
+        if (u > 127) break;
+        i[_ + c] = u;
+      }
+      if (c !== r) {
+        c !== 0 && (e = e.slice(c)), _ = n(_, r, r = c + e.length * 3, 1) >>> 0;
+        const u = T2().subarray(_ + c, _ + r), a = $(e, u);
+        c += a.written, _ = n(_, r, c, 1) >>> 0;
+      }
+      return s = c, _;
+    }
+    __name(f2, "f");
+    var p2 = null;
+    function l2() {
+      return (p2 === null || p2.buffer.detached === true || p2.buffer.detached === void 0 && p2.buffer !== o.memory.buffer) && (p2 = new DataView(o.memory.buffer)), p2;
+    }
+    __name(l2, "l");
+    function x2(e) {
+      const t = o.__externref_table_alloc();
+      return o.__wbindgen_export_4.set(t, e), t;
+    }
+    __name(x2, "x");
+    function g(e, t) {
+      try {
+        return e.apply(this, t);
+      } catch (n) {
+        const r = x2(n);
+        o.__wbindgen_exn_store(r);
+      }
+    }
+    __name(g, "g");
+    var C = typeof TextDecoder > "u" ? (0, module.require)("util").TextDecoder : TextDecoder;
+    var I = new C("utf-8", { ignoreBOM: true, fatal: true });
+    I.decode();
+    function w2(e, t) {
+      return e = e >>> 0, I.decode(T2().subarray(e, e + t));
+    }
+    __name(w2, "w");
+    function b2(e) {
+      return e == null;
+    }
+    __name(b2, "b");
+    var E = typeof FinalizationRegistry > "u" ? { register: /* @__PURE__ */ __name(() => {
+    }, "register"), unregister: /* @__PURE__ */ __name(() => {
+    }, "unregister") } : new FinalizationRegistry((e) => {
+      o.__wbindgen_export_5.get(e.dtor)(e.a, e.b);
+    });
+    function V(e, t, n, r) {
+      const _ = { a: e, b: t, cnt: 1, dtor: n }, i = /* @__PURE__ */ __name((...c) => {
+        _.cnt++;
+        const u = _.a;
+        _.a = 0;
+        try {
+          return r(u, _.b, ...c);
+        } finally {
+          --_.cnt === 0 ? (o.__wbindgen_export_5.get(_.dtor)(u, _.b), E.unregister(_)) : _.a = u;
+        }
+      }, "i");
+      return i.original = _, E.register(i, _, _), i;
+    }
+    __name(V, "V");
+    function A(e) {
+      const t = typeof e;
+      if (t == "number" || t == "boolean" || e == null) return `${e}`;
+      if (t == "string") return `"${e}"`;
+      if (t == "symbol") {
+        const _ = e.description;
+        return _ == null ? "Symbol" : `Symbol(${_})`;
+      }
+      if (t == "function") {
+        const _ = e.name;
+        return typeof _ == "string" && _.length > 0 ? `Function(${_})` : "Function";
+      }
+      if (Array.isArray(e)) {
+        const _ = e.length;
+        let i = "[";
+        _ > 0 && (i += A(e[0]));
+        for (let c = 1; c < _; c++) i += ", " + A(e[c]);
+        return i += "]", i;
+      }
+      const n = /\[object ([^\]]+)\]/.exec(toString.call(e));
+      let r;
+      if (n && n.length > 1) r = n[1];
+      else return toString.call(e);
+      if (r == "Object") try {
+        return "Object(" + JSON.stringify(e) + ")";
+      } catch {
+        return "Object";
+      }
+      return e instanceof Error ? `${e.name}: ${e.message}
+${e.stack}` : r;
+    }
+    __name(A, "A");
+    function O(e) {
+      const t = o.__wbindgen_export_4.get(e);
+      return o.__externref_table_dealloc(e), t;
+    }
+    __name(O, "O");
+    function z(e) {
+      var t = b2(e) ? 0 : f2(e, o.__wbindgen_malloc, o.__wbindgen_realloc), n = s;
+      const r = o.debug_panic(t, n);
+      if (r[1]) throw O(r[0]);
+    }
+    __name(z, "z");
+    function W() {
+      return o.getBuildTimeInfo();
+    }
+    __name(W, "W");
+    function P2(e, t, n) {
+      o.closure594_externref_shim(e, t, n);
+    }
+    __name(P2, "P");
+    function G(e, t, n, r) {
+      o.closure130_externref_shim(e, t, n, r);
+    }
+    __name(G, "G");
+    var F2 = typeof FinalizationRegistry > "u" ? { register: /* @__PURE__ */ __name(() => {
+    }, "register"), unregister: /* @__PURE__ */ __name(() => {
+    }, "unregister") } : new FinalizationRegistry((e) => o.__wbg_queryengine_free(e >>> 0, 1));
+    var Q = class {
+      static {
+        __name(this, "Q");
+      }
+      __destroy_into_raw() {
+        const t = this.__wbg_ptr;
+        return this.__wbg_ptr = 0, F2.unregister(this), t;
+      }
+      free() {
+        const t = this.__destroy_into_raw();
+        o.__wbg_queryengine_free(t, 0);
+      }
+      disconnect(t, n) {
+        const r = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), _ = s, i = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), c = s;
+        return o.queryengine_disconnect(this.__wbg_ptr, r, _, i, c);
+      }
+      startTransaction(t, n, r) {
+        const _ = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), i = s, c = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), u = s, a = f2(r, o.__wbindgen_malloc, o.__wbindgen_realloc), d = s;
+        return o.queryengine_startTransaction(this.__wbg_ptr, _, i, c, u, a, d);
+      }
+      commitTransaction(t, n, r) {
+        const _ = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), i = s, c = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), u = s, a = f2(r, o.__wbindgen_malloc, o.__wbindgen_realloc), d = s;
+        return o.queryengine_commitTransaction(this.__wbg_ptr, _, i, c, u, a, d);
+      }
+      rollbackTransaction(t, n, r) {
+        const _ = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), i = s, c = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), u = s, a = f2(r, o.__wbindgen_malloc, o.__wbindgen_realloc), d = s;
+        return o.queryengine_rollbackTransaction(this.__wbg_ptr, _, i, c, u, a, d);
+      }
+      constructor(t, n, r) {
+        const _ = o.queryengine_new(t, n, r);
+        if (_[2]) throw O(_[1]);
+        return this.__wbg_ptr = _[0] >>> 0, F2.register(this, this.__wbg_ptr, this), this;
+      }
+      query(t, n, r, _) {
+        const i = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), c = s, u = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), a = s;
+        var d = b2(r) ? 0 : f2(r, o.__wbindgen_malloc, o.__wbindgen_realloc), y = s;
+        const M = f2(_, o.__wbindgen_malloc, o.__wbindgen_realloc), j = s;
+        return o.queryengine_query(this.__wbg_ptr, i, c, u, a, d, y, M, j);
+      }
+      trace(t) {
+        const n = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), r = s;
+        return o.queryengine_trace(this.__wbg_ptr, n, r);
+      }
+      connect(t, n) {
+        const r = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), _ = s, i = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), c = s;
+        return o.queryengine_connect(this.__wbg_ptr, r, _, i, c);
+      }
+      metrics(t) {
+        const n = f2(t, o.__wbindgen_malloc, o.__wbindgen_realloc), r = s;
+        return o.queryengine_metrics(this.__wbg_ptr, n, r);
+      }
+    };
+    function H(e, t) {
+      const n = String(t), r = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), _ = s;
+      l2().setInt32(e + 4 * 1, _, true), l2().setInt32(e + 4 * 0, r, true);
+    }
+    __name(H, "H");
+    function J(e) {
+      return e.buffer;
+    }
+    __name(J, "J");
+    function K() {
+      return g(function(e, t) {
+        return e.call(t);
+      }, arguments);
+    }
+    __name(K, "K");
+    function X() {
+      return g(function(e, t, n) {
+        return e.call(t, n);
+      }, arguments);
+    }
+    __name(X, "X");
+    function Y(e) {
+      return e.crypto;
+    }
+    __name(Y, "Y");
+    function Z(e) {
+      return e.done;
+    }
+    __name(Z, "Z");
+    function ee(e) {
+      return Object.entries(e);
+    }
+    __name(ee, "ee");
+    function te(e, t, n) {
+      const r = e.exec(w2(t, n));
+      return b2(r) ? 0 : x2(r);
+    }
+    __name(te, "te");
+    function ne() {
+      return g(function(e, t) {
+        e.getRandomValues(t);
+      }, arguments);
+    }
+    __name(ne, "ne");
+    function re(e) {
+      return e.getTime();
+    }
+    __name(re, "re");
+    function oe() {
+      return g(function(e, t) {
+        return Reflect.get(e, t);
+      }, arguments);
+    }
+    __name(oe, "oe");
+    function _e(e, t) {
+      return e[t >>> 0];
+    }
+    __name(_e, "_e");
+    function ce() {
+      return g(function(e, t) {
+        return e[t];
+      }, arguments);
+    }
+    __name(ce, "ce");
+    function ie(e, t) {
+      return e[t];
+    }
+    __name(ie, "ie");
+    function ue() {
+      return g(function(e, t) {
+        return Reflect.has(e, t);
+      }, arguments);
+    }
+    __name(ue, "ue");
+    function se(e) {
+      let t;
+      try {
+        t = e instanceof ArrayBuffer;
+      } catch {
+        t = false;
+      }
+      return t;
+    }
+    __name(se, "se");
+    function fe(e) {
+      let t;
+      try {
+        t = e instanceof Map;
+      } catch {
+        t = false;
+      }
+      return t;
+    }
+    __name(fe, "fe");
+    function ae(e) {
+      let t;
+      try {
+        t = e instanceof Promise;
+      } catch {
+        t = false;
+      }
+      return t;
+    }
+    __name(ae, "ae");
+    function be(e) {
+      let t;
+      try {
+        t = e instanceof Uint8Array;
+      } catch {
+        t = false;
+      }
+      return t;
+    }
+    __name(be, "be");
+    function ge(e) {
+      return Array.isArray(e);
+    }
+    __name(ge, "ge");
+    function le(e) {
+      return Number.isSafeInteger(e);
+    }
+    __name(le, "le");
+    function de() {
+      return Symbol.iterator;
+    }
+    __name(de, "de");
+    function we(e) {
+      return Object.keys(e);
+    }
+    __name(we, "we");
+    function pe(e) {
+      return e.length;
+    }
+    __name(pe, "pe");
+    function xe(e) {
+      return e.length;
+    }
+    __name(xe, "xe");
+    function ye(e) {
+      return e.msCrypto;
+    }
+    __name(ye, "ye");
+    function me() {
+      return /* @__PURE__ */ new Date();
+    }
+    __name(me, "me");
+    function he(e, t) {
+      try {
+        var n = { a: e, b: t }, r = /* @__PURE__ */ __name((i, c) => {
+          const u = n.a;
+          n.a = 0;
+          try {
+            return G(u, n.b, i, c);
+          } finally {
+            n.a = u;
+          }
+        }, "r");
+        return new Promise(r);
+      } finally {
+        n.a = n.b = 0;
+      }
+    }
+    __name(he, "he");
+    function Te() {
+      return new Object();
+    }
+    __name(Te, "Te");
+    function qe() {
+      return /* @__PURE__ */ new Map();
+    }
+    __name(qe, "qe");
+    function Se(e, t, n, r) {
+      return new RegExp(w2(e, t), w2(n, r));
+    }
+    __name(Se, "Se");
+    function Ae() {
+      return new Array();
+    }
+    __name(Ae, "Ae");
+    function Ie(e) {
+      return new Uint8Array(e);
+    }
+    __name(Ie, "Ie");
+    function Ee(e, t) {
+      return new m(w2(e, t));
+    }
+    __name(Ee, "Ee");
+    function Oe(e, t, n) {
+      return new Uint8Array(e, t >>> 0, n >>> 0);
+    }
+    __name(Oe, "Oe");
+    function Fe(e) {
+      return new Uint8Array(e >>> 0);
+    }
+    __name(Fe, "Fe");
+    function Me(e) {
+      return e.next;
+    }
+    __name(Me, "Me");
+    function je() {
+      return g(function(e) {
+        return e.next();
+      }, arguments);
+    }
+    __name(je, "je");
+    function ke(e) {
+      return e.node;
+    }
+    __name(ke, "ke");
+    function De(e) {
+      return e.now();
+    }
+    __name(De, "De");
+    function Re() {
+      return Date.now();
+    }
+    __name(Re, "Re");
+    function Be() {
+      return g(function() {
+        return Date.now();
+      }, arguments);
+    }
+    __name(Be, "Be");
+    function Ue(e) {
+      return e.process;
+    }
+    __name(Ue, "Ue");
+    function Le(e, t) {
+      return e.push(t);
+    }
+    __name(Le, "Le");
+    function ve(e) {
+      return e.queueMicrotask;
+    }
+    __name(ve, "ve");
+    function Ne(e) {
+      queueMicrotask(e);
+    }
+    __name(Ne, "Ne");
+    function $e() {
+      return g(function(e, t) {
+        e.randomFillSync(t);
+      }, arguments);
+    }
+    __name($e, "$e");
+    function Ce() {
+      return g(function() {
+        return module.require;
+      }, arguments);
+    }
+    __name(Ce, "Ce");
+    function Ve(e) {
+      return Promise.resolve(e);
+    }
+    __name(Ve, "Ve");
+    function ze(e, t) {
+      return setTimeout(e, t >>> 0);
+    }
+    __name(ze, "ze");
+    function We(e, t, n) {
+      e[t >>> 0] = n;
+    }
+    __name(We, "We");
+    function Pe(e, t, n) {
+      e[t] = n;
+    }
+    __name(Pe, "Pe");
+    function Ge(e, t, n) {
+      e.set(t, n >>> 0);
+    }
+    __name(Ge, "Ge");
+    function Qe(e, t, n) {
+      return e.set(t, n);
+    }
+    __name(Qe, "Qe");
+    function He() {
+      return g(function(e, t, n) {
+        return Reflect.set(e, t, n);
+      }, arguments);
+    }
+    __name(He, "He");
+    function Je() {
+      const e = typeof global > "u" ? null : global;
+      return b2(e) ? 0 : x2(e);
+    }
+    __name(Je, "Je");
+    function Ke() {
+      const e = typeof globalThis > "u" ? null : globalThis;
+      return b2(e) ? 0 : x2(e);
+    }
+    __name(Ke, "Ke");
+    function Xe() {
+      const e = typeof self > "u" ? null : self;
+      return b2(e) ? 0 : x2(e);
+    }
+    __name(Xe, "Xe");
+    function Ye() {
+      const e = typeof window > "u" ? null : window;
+      return b2(e) ? 0 : x2(e);
+    }
+    __name(Ye, "Ye");
+    function Ze(e, t, n) {
+      return e.subarray(t >>> 0, n >>> 0);
+    }
+    __name(Ze, "Ze");
+    function et(e, t) {
+      return e.then(t);
+    }
+    __name(et, "et");
+    function tt(e, t, n) {
+      return e.then(t, n);
+    }
+    __name(tt, "tt");
+    function nt(e) {
+      return e.valueOf();
+    }
+    __name(nt, "nt");
+    function rt(e) {
+      return e.value;
+    }
+    __name(rt, "rt");
+    function ot(e) {
+      return e.versions;
+    }
+    __name(ot, "ot");
+    function _t(e) {
+      return +e;
+    }
+    __name(_t, "_t");
+    function ct(e) {
+      return e;
+    }
+    __name(ct, "ct");
+    function it(e) {
+      return BigInt.asUintN(64, e);
+    }
+    __name(it, "it");
+    function ut(e, t) {
+      const n = t, r = typeof n == "bigint" ? n : void 0;
+      l2().setBigInt64(e + 8 * 1, b2(r) ? BigInt(0) : r, true), l2().setInt32(e + 4 * 0, !b2(r), true);
+    }
+    __name(ut, "ut");
+    function st(e) {
+      const t = e;
+      return typeof t == "boolean" ? t ? 1 : 0 : 2;
+    }
+    __name(st, "st");
+    function ft(e) {
+      const t = e.original;
+      return t.cnt-- == 1 ? (t.a = 0, true) : false;
+    }
+    __name(ft, "ft");
+    function at(e, t, n) {
+      return V(e, t, 595, P2);
+    }
+    __name(at, "at");
+    function bt(e, t) {
+      const n = A(t), r = f2(n, o.__wbindgen_malloc, o.__wbindgen_realloc), _ = s;
+      l2().setInt32(e + 4 * 1, _, true), l2().setInt32(e + 4 * 0, r, true);
+    }
+    __name(bt, "bt");
+    function gt(e, t) {
+      return new Error(w2(e, t));
+    }
+    __name(gt, "gt");
+    function lt(e, t) {
+      return e in t;
+    }
+    __name(lt, "lt");
+    function dt() {
+      const e = o.__wbindgen_export_4, t = e.grow(4);
+      e.set(0, void 0), e.set(t + 0, void 0), e.set(t + 1, null), e.set(t + 2, true), e.set(t + 3, false);
+    }
+    __name(dt, "dt");
+    function wt(e) {
+      return typeof e == "bigint";
+    }
+    __name(wt, "wt");
+    function pt(e) {
+      return typeof e == "function";
+    }
+    __name(pt, "pt");
+    function xt(e) {
+      const t = e;
+      return typeof t == "object" && t !== null;
+    }
+    __name(xt, "xt");
+    function yt(e) {
+      return typeof e == "string";
+    }
+    __name(yt, "yt");
+    function mt(e) {
+      return e === void 0;
+    }
+    __name(mt, "mt");
+    function ht(e, t) {
+      return e === t;
+    }
+    __name(ht, "ht");
+    function Tt(e, t) {
+      return e == t;
+    }
+    __name(Tt, "Tt");
+    function qt() {
+      return o.memory;
+    }
+    __name(qt, "qt");
+    function St(e, t) {
+      const n = t, r = typeof n == "number" ? n : void 0;
+      l2().setFloat64(e + 8 * 1, b2(r) ? 0 : r, true), l2().setInt32(e + 4 * 0, !b2(r), true);
+    }
+    __name(St, "St");
+    function At(e) {
+      return e;
+    }
+    __name(At, "At");
+    function It(e, t) {
+      const n = t, r = typeof n == "string" ? n : void 0;
+      var _ = b2(r) ? 0 : f2(r, o.__wbindgen_malloc, o.__wbindgen_realloc), i = s;
+      l2().setInt32(e + 4 * 1, i, true), l2().setInt32(e + 4 * 0, _, true);
+    }
+    __name(It, "It");
+    function Et(e, t) {
+      return w2(e, t);
+    }
+    __name(Et, "Et");
+    function Ot(e, t) {
+      throw new Error(w2(e, t));
+    }
+    __name(Ot, "Ot");
+  }
+});
+
+// ../../node_modules/.prisma/client/wasm-worker-loader.mjs
+var wasm_worker_loader_exports = {};
+__export(wasm_worker_loader_exports, {
+  default: () => wasm_worker_loader_default
+});
+var wasm_worker_loader_default;
+var init_wasm_worker_loader = __esm({
+  "../../node_modules/.prisma/client/wasm-worker-loader.mjs"() {
+    init_modules_watch_stub();
+    init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
+    init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
+    init_performance2();
+    wasm_worker_loader_default = import("./c39b61d7ee62dac9882998c802f3feeffd883e60-query_engine_bg.wasm");
+  }
+});
+
 // ../../node_modules/.prisma/client/wasm.js
 var require_wasm = __commonJS({
   "../../node_modules/.prisma/client/wasm.js"(exports) {
@@ -13747,12 +14425,19 @@ var require_wasm = __commonJS({
       },
       "inlineSchema": '// FixterConnect Database Schema\n// Using Prisma with Supabase PostgreSQL\n\ngenerator client {\n  provider = "prisma-client-js"\n}\n\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n// ============================================\n// USER & AUTH MODELS\n// ============================================\n\nmodel User {\n  id        Int      @id @default(autoincrement())\n  username  String   @unique\n  password  String // bcrypt hashed\n  type      UserType\n  createdAt DateTime @default(now()) @map("created_at")\n  updatedAt DateTime @updatedAt @map("updated_at")\n\n  // Relations\n  client     Client?\n  contractor Contractor?\n\n  @@map("users")\n}\n\nenum UserType {\n  CLIENT\n  CONTRACTOR\n  ADMIN\n}\n\n// ============================================\n// CLIENT MODEL\n// ============================================\n\nmodel Client {\n  id                Int       @id @default(autoincrement())\n  userId            Int       @unique @map("user_id")\n  firstName         String    @map("first_name")\n  lastName          String    @map("last_name")\n  email             String    @unique\n  phone             String\n  address           String?\n  city              String?\n  state             String?\n  zip               String?\n  notificationEmail Boolean   @default(true) @map("notification_email")\n  notificationSms   Boolean   @default(true) @map("notification_sms")\n  profilePicture    String?   @map("profile_picture")\n  isActive          Boolean   @default(true) @map("is_active")\n  isBanned          Boolean   @default(false) @map("is_banned")\n  suspendedUntil    DateTime? @map("suspended_until")\n  createdAt         DateTime  @default(now()) @map("created_at")\n  updatedAt         DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)\n  bookings        Booking[]\n  reviews         Review[]\n  messages        Message[]\n  flaggedMessages FlaggedMessage[]\n  favorites       FavoriteContractor[]\n\n  @@map("clients")\n}\n\n// ============================================\n// CONTRACTOR MODEL\n// ============================================\n\nmodel Contractor {\n  id                Int       @id @default(autoincrement())\n  userId            Int       @unique @map("user_id")\n  name              String\n  email             String?\n  phone             String?\n  description       String?   @db.Text\n  yearsInBusiness   Int?      @map("years_in_business")\n  location          String?\n  googleBusinessUrl String?   @map("google_business_url")\n  verified          Boolean   @default(false)\n  licensed          Boolean   @default(false)\n  rating            Float     @default(0)\n  reviewCount       Int       @default(0) @map("review_count")\n  profilePicture    String?   @map("profile_picture")\n  isActive          Boolean   @default(true) @map("is_active")\n  isBanned          Boolean   @default(false) @map("is_banned")\n  suspendedUntil    DateTime? @map("suspended_until")\n  createdAt         DateTime  @default(now()) @map("created_at")\n  updatedAt         DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)\n  services        ContractorService[]\n  bookings        Booking[]\n  reviews         Review[]\n  messages        Message[]\n  availability    Availability[]\n  serviceAreas    ContractorServiceArea[]\n  flaggedMessages FlaggedMessage[]\n  favoritedBy     FavoriteContractor[]\n\n  @@map("contractors")\n}\n\n// ============================================\n// SERVICES\n// ============================================\n\nmodel Service {\n  id          Int      @id @default(autoincrement())\n  name        String   @unique\n  icon        String\n  description String?  @db.Text\n  createdAt   DateTime @default(now()) @map("created_at")\n\n  // Relations\n  contractors ContractorService[]\n  bookings    Booking[]\n\n  @@map("services")\n}\n\nmodel ContractorService {\n  id           Int      @id @default(autoincrement())\n  contractorId Int      @map("contractor_id")\n  serviceId    Int      @map("service_id")\n  basePrice    Float?   @map("base_price")\n  createdAt    DateTime @default(now()) @map("created_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n  service    Service    @relation(fields: [serviceId], references: [id], onDelete: Cascade)\n\n  @@unique([contractorId, serviceId])\n  @@map("contractor_services")\n}\n\n// ============================================\n// BOOKINGS & JOBS\n// ============================================\n\nmodel Booking {\n  id                Int           @id @default(autoincrement())\n  contractorId      Int           @map("contractor_id")\n  clientId          Int           @map("client_id")\n  serviceId         Int           @map("service_id")\n  serviceAddress    String        @map("service_address")\n  scheduledDate     DateTime      @map("scheduled_date")\n  scheduledTime     String        @map("scheduled_time")\n  estimatedDuration Int?          @map("estimated_duration") // in minutes\n  status            BookingStatus @default(PENDING)\n  price             Float?\n  paymentReceived   Boolean       @default(false) @map("payment_received")\n  createdAt         DateTime      @default(now()) @map("created_at")\n  updatedAt         DateTime      @updatedAt @map("updated_at")\n\n  // Relations\n  contractor Contractor     @relation(fields: [contractorId], references: [id])\n  client     Client         @relation(fields: [clientId], references: [id])\n  service    Service        @relation(fields: [serviceId], references: [id])\n  completion JobCompletion?\n  photos     JobPhoto[]\n  invoice    Invoice?\n  payments   Payment[]\n\n  @@index([contractorId])\n  @@index([clientId])\n  @@index([scheduledDate])\n  @@index([contractorId, scheduledDate, status])\n  @@map("bookings")\n}\n\nenum BookingStatus {\n  PENDING\n  CONFIRMED\n  IN_PROGRESS\n  COMPLETED\n  CANCELLED\n}\n\nmodel JobCompletion {\n  id           Int       @id @default(autoincrement())\n  bookingId    Int       @unique @map("booking_id")\n  startTime    DateTime? @map("start_time")\n  endTime      DateTime? @map("end_time")\n  materials    String?   @db.Text\n  notes        String?   @db.Text\n  audioNoteUrl String?   @map("audio_note_url")\n  createdAt    DateTime  @default(now()) @map("created_at")\n  updatedAt    DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  @@map("job_completions")\n}\n\nmodel JobPhoto {\n  id           Int       @id @default(autoincrement())\n  bookingId    Int       @map("booking_id")\n  filename     String\n  originalName String    @map("original_name")\n  photoType    PhotoType @map("photo_type")\n  fileSize     Int       @map("file_size")\n  url          String\n  createdAt    DateTime  @default(now()) @map("created_at")\n\n  // Relations\n  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)\n\n  @@index([bookingId])\n  @@map("job_photos")\n}\n\nenum PhotoType {\n  BEFORE\n  AFTER\n  ADDITIONAL\n}\n\n// ============================================\n// MESSAGING\n// ============================================\n\nmodel Message {\n  id           Int           @id @default(autoincrement())\n  contractorId Int           @map("contractor_id")\n  clientId     Int           @map("client_id")\n  subject      String?\n  status       MessageStatus @default(UNREAD)\n  createdAt    DateTime      @default(now()) @map("created_at")\n  updatedAt    DateTime      @updatedAt @map("updated_at")\n\n  // Relations\n  contractor   Contractor    @relation(fields: [contractorId], references: [id])\n  client       Client        @relation(fields: [clientId], references: [id])\n  chatMessages ChatMessage[]\n\n  @@index([contractorId])\n  @@index([clientId])\n  @@map("messages")\n}\n\nenum MessageStatus {\n  READ\n  UNREAD\n}\n\nmodel ChatMessage {\n  id          Int        @id @default(autoincrement())\n  messageId   Int        @map("message_id")\n  sender      SenderType\n  messageText String     @map("message_text") @db.Text\n  createdAt   DateTime   @default(now()) @map("created_at")\n\n  // Relations\n  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)\n\n  @@index([messageId])\n  @@map("chat_messages")\n}\n\nenum SenderType {\n  CONTRACTOR\n  CLIENT\n}\n\nmodel FlaggedMessage {\n  id           Int           @id @default(autoincrement())\n  messageId    Int?          @map("message_id")\n  messageText  String        @map("message_text") @db.Text\n  flaggedBy    FlaggedByType @map("flagged_by")\n  flaggedById  Int           @map("flagged_by_id")\n  contractorId Int?          @map("contractor_id")\n  clientId     Int?          @map("client_id")\n  reason       String\n  details      String?       @db.Text\n  status       FlagStatus    @default(PENDING)\n  reviewedBy   Int?          @map("reviewed_by")\n  reviewedAt   DateTime?     @map("reviewed_at")\n  createdAt    DateTime      @default(now()) @map("created_at")\n\n  // Relations\n  contractor Contractor? @relation(fields: [contractorId], references: [id])\n  client     Client?     @relation(fields: [clientId], references: [id])\n\n  @@index([status])\n  @@map("flagged_messages")\n}\n\nenum FlaggedByType {\n  CONTRACTOR\n  CLIENT\n}\n\nenum FlagStatus {\n  PENDING\n  REVIEWED\n  RESOLVED\n  DISMISSED\n}\n\n// ============================================\n// REVIEWS & RATINGS\n// ============================================\n\nmodel Review {\n  id           Int      @id @default(autoincrement())\n  contractorId Int      @map("contractor_id")\n  clientId     Int      @map("client_id")\n  rating       Int // 1-5 stars\n  reviewText   String?  @map("review_text") @db.Text\n  createdAt    DateTime @default(now()) @map("created_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id])\n  client     Client     @relation(fields: [clientId], references: [id])\n\n  @@index([contractorId])\n  @@map("reviews")\n}\n\n// ============================================\n// PAYMENTS & INVOICES\n// ============================================\n\nmodel Invoice {\n  id          Int           @id @default(autoincrement())\n  bookingId   Int           @unique @map("booking_id")\n  amount      Float\n  taxAmount   Float?        @map("tax_amount")\n  totalAmount Float         @map("total_amount")\n  status      InvoiceStatus @default(PENDING)\n  dueDate     DateTime?     @map("due_date")\n  paidAt      DateTime?     @map("paid_at")\n  createdAt   DateTime      @default(now()) @map("created_at")\n  updatedAt   DateTime      @updatedAt @map("updated_at")\n\n  // Relations\n  booking  Booking   @relation(fields: [bookingId], references: [id])\n  payments Payment[]\n\n  @@map("invoices")\n}\n\nenum InvoiceStatus {\n  PENDING\n  PAID\n  OVERDUE\n  CANCELLED\n}\n\nmodel Payment {\n  id                  Int           @id @default(autoincrement())\n  bookingId           Int           @map("booking_id")\n  invoiceId           Int?          @map("invoice_id")\n  amount              Float\n  paymentMethod       String        @map("payment_method")\n  stripePaymentId     String?       @unique @map("stripe_payment_id")\n  stripePaymentIntent String?       @unique @map("stripe_payment_intent")\n  status              PaymentStatus @default(PENDING)\n  paidAt              DateTime?     @map("paid_at")\n  createdAt           DateTime      @default(now()) @map("created_at")\n\n  // Relations\n  booking Booking  @relation(fields: [bookingId], references: [id])\n  invoice Invoice? @relation(fields: [invoiceId], references: [id])\n\n  @@index([bookingId])\n  @@map("payments")\n}\n\nenum PaymentStatus {\n  PENDING\n  PROCESSING\n  SUCCEEDED\n  FAILED\n  REFUNDED\n}\n\n// ============================================\n// CONTRACTOR AVAILABILITY\n// ============================================\n\n// General working hours for contractors (recurring schedule)\nmodel Availability {\n  id           Int       @id @default(autoincrement())\n  contractorId Int       @map("contractor_id")\n  dayOfWeek    Int?      @map("day_of_week") // 0=Sunday, 1=Monday, etc. NULL for specific dates\n  specificDate DateTime? @map("specific_date") // For one-time overrides (vacation, holidays)\n  startTime    String    @map("start_time") // e.g., "08:00"\n  endTime      String    @map("end_time") // e.g., "17:00"\n  maxBookings  Int       @default(8) @map("max_bookings") // Max jobs per day\n  isAvailable  Boolean   @default(true) @map("is_available")\n  isRecurring  Boolean   @default(true) @map("is_recurring") // true = recurring weekly, false = specific date\n  createdAt    DateTime  @default(now()) @map("created_at")\n  updatedAt    DateTime  @updatedAt @map("updated_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n\n  @@index([contractorId, dayOfWeek])\n  @@index([contractorId, specificDate])\n  @@map("availability")\n}\n\n// ============================================\n// SERVICE AREAS\n// ============================================\n\n// Tracks which areas a contractor serves on which days\nmodel ContractorServiceArea {\n  id           Int      @id @default(autoincrement())\n  contractorId Int      @map("contractor_id")\n  dayOfWeek    Int?     @map("day_of_week") // 0=Sunday, 1=Monday, etc. NULL = all days\n  area         String // City/area name (e.g., "Boise", "Nampa")\n  isActive     Boolean  @default(true) @map("is_active")\n  createdAt    DateTime @default(now()) @map("created_at")\n  updatedAt    DateTime @updatedAt @map("updated_at")\n\n  // Relations\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n\n  @@index([contractorId, dayOfWeek])\n  @@index([area])\n  @@map("contractor_service_areas")\n}\n\n// ============================================\n// FAVORITE CONTRACTORS\n// ============================================\n\nmodel FavoriteContractor {\n  id           Int      @id @default(autoincrement())\n  clientId     Int      @map("client_id")\n  contractorId Int      @map("contractor_id")\n  createdAt    DateTime @default(now()) @map("created_at")\n\n  // Relations\n  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)\n  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)\n\n  @@unique([clientId, contractorId])\n  @@index([clientId])\n  @@map("favorite_contractors")\n}\n\n// ============================================\n// ADMIN ACTIVITY LOGS\n// ============================================\n\nenum ActivitySeverity {\n  LOW\n  MEDIUM\n  HIGH\n}\n\nmodel ActivityLog {\n  id        Int              @id @default(autoincrement())\n  userId    Int?             @map("user_id") // Admin user who performed the action\n  action    String // e.g., "Flag Dismissed", "User Suspended", "User Banned"\n  details   String           @db.Text // Full description of what happened\n  severity  ActivitySeverity @default(LOW)\n  metadata  Json? // Additional structured data (user IDs, flag IDs, etc.)\n  createdAt DateTime         @default(now()) @map("created_at")\n\n  @@index([createdAt])\n  @@index([severity])\n  @@map("activity_logs")\n}\n',
       "inlineSchemaHash": "8f2ccfe64660c30850b8766ba153e675908e822190d83a352cf22d905a0361c6",
-      "copyEngine": false
+      "copyEngine": true
     };
     config2.dirname = "/";
     config2.runtimeDataModel = JSON.parse('{"models":{"User":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"username","kind":"scalar","type":"String"},{"name":"password","kind":"scalar","type":"String"},{"name":"type","kind":"enum","type":"UserType"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"client","kind":"object","type":"Client","relationName":"ClientToUser"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToUser"}],"dbName":"users"},"Client":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"userId","kind":"scalar","type":"Int","dbName":"user_id"},{"name":"firstName","kind":"scalar","type":"String","dbName":"first_name"},{"name":"lastName","kind":"scalar","type":"String","dbName":"last_name"},{"name":"email","kind":"scalar","type":"String"},{"name":"phone","kind":"scalar","type":"String"},{"name":"address","kind":"scalar","type":"String"},{"name":"city","kind":"scalar","type":"String"},{"name":"state","kind":"scalar","type":"String"},{"name":"zip","kind":"scalar","type":"String"},{"name":"notificationEmail","kind":"scalar","type":"Boolean","dbName":"notification_email"},{"name":"notificationSms","kind":"scalar","type":"Boolean","dbName":"notification_sms"},{"name":"profilePicture","kind":"scalar","type":"String","dbName":"profile_picture"},{"name":"isActive","kind":"scalar","type":"Boolean","dbName":"is_active"},{"name":"isBanned","kind":"scalar","type":"Boolean","dbName":"is_banned"},{"name":"suspendedUntil","kind":"scalar","type":"DateTime","dbName":"suspended_until"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"user","kind":"object","type":"User","relationName":"ClientToUser"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToClient"},{"name":"reviews","kind":"object","type":"Review","relationName":"ClientToReview"},{"name":"messages","kind":"object","type":"Message","relationName":"ClientToMessage"},{"name":"flaggedMessages","kind":"object","type":"FlaggedMessage","relationName":"ClientToFlaggedMessage"},{"name":"favorites","kind":"object","type":"FavoriteContractor","relationName":"ClientToFavoriteContractor"}],"dbName":"clients"},"Contractor":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"userId","kind":"scalar","type":"Int","dbName":"user_id"},{"name":"name","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"phone","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"yearsInBusiness","kind":"scalar","type":"Int","dbName":"years_in_business"},{"name":"location","kind":"scalar","type":"String"},{"name":"googleBusinessUrl","kind":"scalar","type":"String","dbName":"google_business_url"},{"name":"verified","kind":"scalar","type":"Boolean"},{"name":"licensed","kind":"scalar","type":"Boolean"},{"name":"rating","kind":"scalar","type":"Float"},{"name":"reviewCount","kind":"scalar","type":"Int","dbName":"review_count"},{"name":"profilePicture","kind":"scalar","type":"String","dbName":"profile_picture"},{"name":"isActive","kind":"scalar","type":"Boolean","dbName":"is_active"},{"name":"isBanned","kind":"scalar","type":"Boolean","dbName":"is_banned"},{"name":"suspendedUntil","kind":"scalar","type":"DateTime","dbName":"suspended_until"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"user","kind":"object","type":"User","relationName":"ContractorToUser"},{"name":"services","kind":"object","type":"ContractorService","relationName":"ContractorToContractorService"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToContractor"},{"name":"reviews","kind":"object","type":"Review","relationName":"ContractorToReview"},{"name":"messages","kind":"object","type":"Message","relationName":"ContractorToMessage"},{"name":"availability","kind":"object","type":"Availability","relationName":"AvailabilityToContractor"},{"name":"serviceAreas","kind":"object","type":"ContractorServiceArea","relationName":"ContractorToContractorServiceArea"},{"name":"flaggedMessages","kind":"object","type":"FlaggedMessage","relationName":"ContractorToFlaggedMessage"},{"name":"favoritedBy","kind":"object","type":"FavoriteContractor","relationName":"ContractorToFavoriteContractor"}],"dbName":"contractors"},"Service":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"name","kind":"scalar","type":"String"},{"name":"icon","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"contractors","kind":"object","type":"ContractorService","relationName":"ContractorServiceToService"},{"name":"bookings","kind":"object","type":"Booking","relationName":"BookingToService"}],"dbName":"services"},"ContractorService":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"serviceId","kind":"scalar","type":"Int","dbName":"service_id"},{"name":"basePrice","kind":"scalar","type":"Float","dbName":"base_price"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToContractorService"},{"name":"service","kind":"object","type":"Service","relationName":"ContractorServiceToService"}],"dbName":"contractor_services"},"Booking":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"clientId","kind":"scalar","type":"Int","dbName":"client_id"},{"name":"serviceId","kind":"scalar","type":"Int","dbName":"service_id"},{"name":"serviceAddress","kind":"scalar","type":"String","dbName":"service_address"},{"name":"scheduledDate","kind":"scalar","type":"DateTime","dbName":"scheduled_date"},{"name":"scheduledTime","kind":"scalar","type":"String","dbName":"scheduled_time"},{"name":"estimatedDuration","kind":"scalar","type":"Int","dbName":"estimated_duration"},{"name":"status","kind":"enum","type":"BookingStatus"},{"name":"price","kind":"scalar","type":"Float"},{"name":"paymentReceived","kind":"scalar","type":"Boolean","dbName":"payment_received"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"BookingToContractor"},{"name":"client","kind":"object","type":"Client","relationName":"BookingToClient"},{"name":"service","kind":"object","type":"Service","relationName":"BookingToService"},{"name":"completion","kind":"object","type":"JobCompletion","relationName":"BookingToJobCompletion"},{"name":"photos","kind":"object","type":"JobPhoto","relationName":"BookingToJobPhoto"},{"name":"invoice","kind":"object","type":"Invoice","relationName":"BookingToInvoice"},{"name":"payments","kind":"object","type":"Payment","relationName":"BookingToPayment"}],"dbName":"bookings"},"JobCompletion":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"bookingId","kind":"scalar","type":"Int","dbName":"booking_id"},{"name":"startTime","kind":"scalar","type":"DateTime","dbName":"start_time"},{"name":"endTime","kind":"scalar","type":"DateTime","dbName":"end_time"},{"name":"materials","kind":"scalar","type":"String"},{"name":"notes","kind":"scalar","type":"String"},{"name":"audioNoteUrl","kind":"scalar","type":"String","dbName":"audio_note_url"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToJobCompletion"}],"dbName":"job_completions"},"JobPhoto":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"bookingId","kind":"scalar","type":"Int","dbName":"booking_id"},{"name":"filename","kind":"scalar","type":"String"},{"name":"originalName","kind":"scalar","type":"String","dbName":"original_name"},{"name":"photoType","kind":"enum","type":"PhotoType","dbName":"photo_type"},{"name":"fileSize","kind":"scalar","type":"Int","dbName":"file_size"},{"name":"url","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToJobPhoto"}],"dbName":"job_photos"},"Message":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"clientId","kind":"scalar","type":"Int","dbName":"client_id"},{"name":"subject","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"MessageStatus"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToMessage"},{"name":"client","kind":"object","type":"Client","relationName":"ClientToMessage"},{"name":"chatMessages","kind":"object","type":"ChatMessage","relationName":"ChatMessageToMessage"}],"dbName":"messages"},"ChatMessage":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"messageId","kind":"scalar","type":"Int","dbName":"message_id"},{"name":"sender","kind":"enum","type":"SenderType"},{"name":"messageText","kind":"scalar","type":"String","dbName":"message_text"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"message","kind":"object","type":"Message","relationName":"ChatMessageToMessage"}],"dbName":"chat_messages"},"FlaggedMessage":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"messageId","kind":"scalar","type":"Int","dbName":"message_id"},{"name":"messageText","kind":"scalar","type":"String","dbName":"message_text"},{"name":"flaggedBy","kind":"enum","type":"FlaggedByType","dbName":"flagged_by"},{"name":"flaggedById","kind":"scalar","type":"Int","dbName":"flagged_by_id"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"clientId","kind":"scalar","type":"Int","dbName":"client_id"},{"name":"reason","kind":"scalar","type":"String"},{"name":"details","kind":"scalar","type":"String"},{"name":"status","kind":"enum","type":"FlagStatus"},{"name":"reviewedBy","kind":"scalar","type":"Int","dbName":"reviewed_by"},{"name":"reviewedAt","kind":"scalar","type":"DateTime","dbName":"reviewed_at"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToFlaggedMessage"},{"name":"client","kind":"object","type":"Client","relationName":"ClientToFlaggedMessage"}],"dbName":"flagged_messages"},"Review":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"clientId","kind":"scalar","type":"Int","dbName":"client_id"},{"name":"rating","kind":"scalar","type":"Int"},{"name":"reviewText","kind":"scalar","type":"String","dbName":"review_text"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToReview"},{"name":"client","kind":"object","type":"Client","relationName":"ClientToReview"}],"dbName":"reviews"},"Invoice":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"bookingId","kind":"scalar","type":"Int","dbName":"booking_id"},{"name":"amount","kind":"scalar","type":"Float"},{"name":"taxAmount","kind":"scalar","type":"Float","dbName":"tax_amount"},{"name":"totalAmount","kind":"scalar","type":"Float","dbName":"total_amount"},{"name":"status","kind":"enum","type":"InvoiceStatus"},{"name":"dueDate","kind":"scalar","type":"DateTime","dbName":"due_date"},{"name":"paidAt","kind":"scalar","type":"DateTime","dbName":"paid_at"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToInvoice"},{"name":"payments","kind":"object","type":"Payment","relationName":"InvoiceToPayment"}],"dbName":"invoices"},"Payment":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"bookingId","kind":"scalar","type":"Int","dbName":"booking_id"},{"name":"invoiceId","kind":"scalar","type":"Int","dbName":"invoice_id"},{"name":"amount","kind":"scalar","type":"Float"},{"name":"paymentMethod","kind":"scalar","type":"String","dbName":"payment_method"},{"name":"stripePaymentId","kind":"scalar","type":"String","dbName":"stripe_payment_id"},{"name":"stripePaymentIntent","kind":"scalar","type":"String","dbName":"stripe_payment_intent"},{"name":"status","kind":"enum","type":"PaymentStatus"},{"name":"paidAt","kind":"scalar","type":"DateTime","dbName":"paid_at"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"booking","kind":"object","type":"Booking","relationName":"BookingToPayment"},{"name":"invoice","kind":"object","type":"Invoice","relationName":"InvoiceToPayment"}],"dbName":"payments"},"Availability":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"dayOfWeek","kind":"scalar","type":"Int","dbName":"day_of_week"},{"name":"specificDate","kind":"scalar","type":"DateTime","dbName":"specific_date"},{"name":"startTime","kind":"scalar","type":"String","dbName":"start_time"},{"name":"endTime","kind":"scalar","type":"String","dbName":"end_time"},{"name":"maxBookings","kind":"scalar","type":"Int","dbName":"max_bookings"},{"name":"isAvailable","kind":"scalar","type":"Boolean","dbName":"is_available"},{"name":"isRecurring","kind":"scalar","type":"Boolean","dbName":"is_recurring"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"AvailabilityToContractor"}],"dbName":"availability"},"ContractorServiceArea":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"dayOfWeek","kind":"scalar","type":"Int","dbName":"day_of_week"},{"name":"area","kind":"scalar","type":"String"},{"name":"isActive","kind":"scalar","type":"Boolean","dbName":"is_active"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"updatedAt","kind":"scalar","type":"DateTime","dbName":"updated_at"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToContractorServiceArea"}],"dbName":"contractor_service_areas"},"FavoriteContractor":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"clientId","kind":"scalar","type":"Int","dbName":"client_id"},{"name":"contractorId","kind":"scalar","type":"Int","dbName":"contractor_id"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"},{"name":"client","kind":"object","type":"Client","relationName":"ClientToFavoriteContractor"},{"name":"contractor","kind":"object","type":"Contractor","relationName":"ContractorToFavoriteContractor"}],"dbName":"favorite_contractors"},"ActivityLog":{"fields":[{"name":"id","kind":"scalar","type":"Int"},{"name":"userId","kind":"scalar","type":"Int","dbName":"user_id"},{"name":"action","kind":"scalar","type":"String"},{"name":"details","kind":"scalar","type":"String"},{"name":"severity","kind":"enum","type":"ActivitySeverity"},{"name":"metadata","kind":"scalar","type":"Json"},{"name":"createdAt","kind":"scalar","type":"DateTime","dbName":"created_at"}],"dbName":"activity_logs"}},"enums":{},"types":{}}');
     defineDmmfProperty2(exports.Prisma, config2.runtimeDataModel);
-    config2.engineWasm = void 0;
+    config2.engineWasm = {
+      getRuntime: /* @__PURE__ */ __name(async () => require_query_engine_bg(), "getRuntime"),
+      getQueryEngineWasmModule: /* @__PURE__ */ __name(async () => {
+        const loader = (await Promise.resolve().then(() => (init_wasm_worker_loader(), wasm_worker_loader_exports))).default;
+        const engine = (await loader).default;
+        return engine;
+      }, "getQueryEngineWasmModule")
+    };
     config2.compilerWasm = void 0;
     config2.injectableEdgeEnv = () => ({
       parsed: {
@@ -15794,7 +16479,7 @@ var knownUserAgents = {
   node: "Node.js"
 };
 var getRuntimeKey = /* @__PURE__ */ __name(() => {
-  const global = globalThis;
+  const global2 = globalThis;
   const userAgentSupported = typeof navigator !== "undefined" && true;
   if (userAgentSupported) {
     for (const [runtimeKey, userAgent] of Object.entries(knownUserAgents)) {
@@ -15803,13 +16488,13 @@ var getRuntimeKey = /* @__PURE__ */ __name(() => {
       }
     }
   }
-  if (typeof global?.EdgeRuntime === "string") {
+  if (typeof global2?.EdgeRuntime === "string") {
     return "edge-light";
   }
-  if (global?.fastly !== void 0) {
+  if (global2?.fastly !== void 0) {
     return "fastly";
   }
-  if (global?.process?.release?.name === "node") {
+  if (global2?.process?.release?.name === "node") {
     return "node";
   }
   return "other";

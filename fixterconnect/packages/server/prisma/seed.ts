@@ -1,7 +1,17 @@
 import { PrismaClient, UserType } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+// SHA-256 hash function matching Workers implementation
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -10,12 +20,14 @@ async function main() {
   console.log('Creating test users...');
 
   // Create client test user
-  const clientPassword = await bcrypt.hash('password123', 10);
+  const clientPassword = await hashPassword('password123');
   await prisma.user.upsert({
     where: {
       username: 'testuser'
     },
-    update: {},
+    update: {
+      password: clientPassword
+    },
     create: {
       username: 'testuser',
       password: clientPassword,
@@ -36,12 +48,14 @@ async function main() {
   });
 
   // Create contractor test user
-  const contractorPassword = await bcrypt.hash('contractor123', 10);
+  const contractorPassword = await hashPassword('contractor123');
   await prisma.user.upsert({
     where: {
       username: 'johnsmith'
     },
-    update: {},
+    update: {
+      password: contractorPassword
+    },
     create: {
       username: 'johnsmith',
       password: contractorPassword,
