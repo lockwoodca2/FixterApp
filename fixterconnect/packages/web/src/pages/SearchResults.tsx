@@ -15,6 +15,7 @@ import {
 import { ApiClient } from '@fixterconnect/core';
 import type { Contractor, ServiceArea } from '@fixterconnect/core';
 import type { Service } from '@fixterconnect/core';
+import { API_BASE_URL } from '../config/api';
 
 const apiClient = new ApiClient();
 
@@ -76,7 +77,7 @@ const SearchResults: React.FC = () => {
           }
         } else {
           // Load all contractors when no specific service is selected
-          const response = await fetch('http://localhost:3001/api/contractors');
+          const response = await fetch(`${API_BASE_URL}/contractors`);
           const data = await response.json();
           if (data.success) {
             contractorsData = data.contractors;

@@ -1071,7 +1071,7 @@ const ContractorDashboard: React.FC = () => {
       if (!user?.id || activeSection !== 'calendar') return;
 
       try {
-        const response = await fetch(`http://localhost:3001/api/bookings/contractor/${user.id}`);
+        const response = await fetch(`${API_BASE_URL}/bookings/contractor/${user.id}`);
         const result = await response.json();
         const data = result.bookings || result; // Handle both {bookings: []} and [] formats
 
@@ -1859,7 +1859,7 @@ const ContractorDashboard: React.FC = () => {
                           };
                         });
 
-                      const response = await fetch(`http://localhost:3001/api/availability/contractor/${user.id}/schedule`, {
+                      const response = await fetch(`${API_BASE_URL}/availability/contractor/${user.id}/schedule`, {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json'
