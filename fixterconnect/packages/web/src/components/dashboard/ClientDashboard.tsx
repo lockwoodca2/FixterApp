@@ -1760,8 +1760,6 @@ const ClientDashboard: React.FC = () => {
     }
   };
 
-  console.log('ClientDashboard rendering - showChatModal:', showChatModal, 'selectedConversation:', selectedConversation);
-
   return (
     <div style={{
       display: 'flex',
