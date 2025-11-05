@@ -17,7 +17,7 @@ import type { Contractor, ServiceArea } from '@fixterconnect/core';
 import type { Service } from '@fixterconnect/core';
 import { API_BASE_URL } from '../config/api';
 
-const apiClient = new ApiClient();
+const apiClient = new ApiClient(API_BASE_URL);
 
 const SearchResults: React.FC = () => {
   const navigate = useNavigate();

@@ -16,8 +16,9 @@ import {
 } from 'react-feather';
 import { ApiClient } from '@fixterconnect/core';
 import type { Service } from '@fixterconnect/core';
+import { API_BASE_URL } from '../config/api';
 
-const apiClient = new ApiClient();
+const apiClient = new ApiClient(API_BASE_URL);
 
 // Mock services data organized by category
 const MOCK_SERVICES_BY_CATEGORY = {

@@ -23,7 +23,7 @@ import type { Contractor } from '@fixterconnect/core';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
-const apiClient = new ApiClient();
+const apiClient = new ApiClient(API_BASE_URL);
 
 // Mock contractor data (matching SearchResults mock data)
 const MOCK_CONTRACTORS: Contractor[] = [
