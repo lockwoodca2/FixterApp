@@ -24,7 +24,8 @@ router.get('/admin/users', async (req, res) => {
 
     // Transform clients
     const clientUsers = clients.map(client => ({
-      id: client.id,
+      id: `client-${client.id}`, // Unique composite key
+      originalId: client.id, // Keep original ID for operations
       name: `${client.firstName} ${client.lastName}`,
       email: client.email,
       phone: client.phone,
@@ -37,7 +38,8 @@ router.get('/admin/users', async (req, res) => {
 
     // Transform contractors
     const contractorUsers = contractors.map(contractor => ({
-      id: contractor.id,
+      id: `contractor-${contractor.id}`, // Unique composite key
+      originalId: contractor.id, // Keep original ID for operations
       name: contractor.name,
       email: contractor.email || '',
       phone: contractor.phone || '',
@@ -211,6 +213,47 @@ router.patch('/admin/flagged-messages/:id/status', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to update status'
+    });
+  }
+});
+
+// Get activity logs
+router.get('/admin/activity-logs', async (req, res) => {
+  try {
+    const { limit = '50', severity } = req.query;
+
+    const where: any = {};
+    if (severity && ['LOW', 'MEDIUM', 'HIGH'].includes(severity as string)) {
+      where.severity = severity;
+    }
+
+    const logs = await prisma.activityLog.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: parseInt(limit as string)
+    });
+
+    // Transform logs to match frontend interface
+    const transformedLogs = logs.map(log => ({
+      id: log.id,
+      user: 'Admin', // TODO: Get actual admin username from userId
+      action: log.action,
+      details: log.details,
+      timestamp: log.createdAt.toISOString(),
+      severity: log.severity.toLowerCase() as 'low' | 'medium' | 'high'
+    }));
+
+    return res.json({
+      success: true,
+      logs: transformedLogs
+    });
+  } catch (error) {
+    console.error('Error fetching activity logs:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch activity logs'
     });
   }
 });

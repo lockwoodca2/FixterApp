@@ -53,6 +53,9 @@ model Client {
   notificationEmail Boolean @default(true) @map("notification_email")
   notificationSms   Boolean @default(true) @map("notification_sms")
   profilePicture    String? @map("profile_picture")
+  isActive          Boolean @default(true) @map("is_active")
+  isBanned          Boolean @default(false) @map("is_banned")
+  suspendedUntil    DateTime? @map("suspended_until")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -86,6 +89,9 @@ model Contractor {
   rating           Float    @default(0)
   reviewCount      Int      @default(0) @map("review_count")
   profilePicture   String?  @map("profile_picture")
+  isActive         Boolean  @default(true) @map("is_active")
+  isBanned         Boolean  @default(false) @map("is_banned")
+  suspendedUntil   DateTime? @map("suspended_until")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -444,4 +450,28 @@ model FavoriteContractor {
   @@unique([clientId, contractorId])
   @@index([clientId])
   @@map("favorite_contractors")
+}
+
+// ============================================
+// ADMIN ACTIVITY LOGS
+// ============================================
+
+enum ActivitySeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model ActivityLog {
+  id        Int              @id @default(autoincrement())
+  userId    Int?             @map("user_id") // Admin user who performed the action
+  action    String           // e.g., "Flag Dismissed", "User Suspended", "User Banned"
+  details   String           @db.Text // Full description of what happened
+  severity  ActivitySeverity @default(LOW)
+  metadata  Json?            // Additional structured data (user IDs, flag IDs, etc.)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([severity])
+  @@map("activity_logs")
 }

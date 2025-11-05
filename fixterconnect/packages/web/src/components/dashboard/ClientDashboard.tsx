@@ -1192,7 +1192,7 @@ const ClientDashboard: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/messages/flag-message`, {
+      const response = await fetch(`${API_BASE_URL}/flag-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

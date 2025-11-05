@@ -36,15 +36,29 @@ interface User {
   totalEarned?: number;
 }
 
-interface Message {
+interface FlaggedMessage {
   id: number;
-  conversationId: number;
-  clientName: string;
-  contractorName: string;
-  sender: string;
-  message: string;
-  timestamp: string;
-  flagged?: boolean;
+  messageId: number | null;
+  messageText: string;
+  flaggedBy: 'CONTRACTOR' | 'CLIENT';
+  flaggedById: number;
+  contractorId: number;
+  clientId: number;
+  reason: string;
+  details: string | null;
+  status: 'PENDING' | 'REVIEWED' | 'ACTION_TAKEN' | 'DISMISSED';
+  reviewedBy: number | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  contractor: {
+    id: number;
+    name: string;
+  };
+  client: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 interface Report {
@@ -91,9 +105,14 @@ const AdminDashboard: React.FC = () => {
   // State for real data from API
   const [users, setUsers] = useState<User[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [flaggedMessages, setFlaggedMessages] = useState<FlaggedMessage[]>([]);
+  const [selectedFlag, setSelectedFlag] = useState<FlaggedMessage | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [actionNote, setActionNote] = useState('');
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<string>('');
   const [reports] = useState<Report[]>([]); // Keep empty for now
-  const [activityLogs] = useState<ActivityLog[]>([]); // Keep empty for now
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
   // Fetch admin data when authenticated
   useEffect(() => {
@@ -121,16 +140,148 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Fetch flagged messages
-      const messagesResponse = await fetch(`${API_BASE_URL}/admin/flagged-messages`);
+      const messagesResponse = await fetch(`${API_BASE_URL}/flagged-messages`);
       const messagesData = await messagesResponse.json();
       if (messagesData.success) {
-        setMessages(messagesData.messages);
+        setFlaggedMessages(messagesData.flaggedMessages);
+      }
+
+      // Fetch activity logs
+      const logsResponse = await fetch(`${API_BASE_URL}/admin/activity-logs`);
+      const logsData = await logsResponse.json();
+      if (logsData.success) {
+        setActivityLogs(logsData.logs);
       }
 
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle admin actions on flagged messages
+  const handleAdminAction = async (action: string) => {
+    if (!selectedFlag) return;
+
+    try {
+      // Determine the target user based on who was flagged
+      const targetUserId = selectedFlag.flaggedBy === 'CLIENT'
+        ? selectedFlag.contractorId
+        : selectedFlag.clientId;
+
+      const targetUserType = selectedFlag.flaggedBy === 'CLIENT' ? 'CONTRACTOR' : 'CLIENT';
+
+      // Handle different actions
+      if (action === 'dismiss') {
+        // Just update the flag status to DISMISSED
+        const response = await fetch(`${API_BASE_URL}/flagged-messages/${selectedFlag.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            status: 'DISMISSED',
+            reviewedBy: 1, // TODO: Replace with actual admin user ID
+            adminNote: actionNote || 'Flag dismissed - no action required'
+          })
+        });
+
+        if (response.ok) {
+          alert('Flag dismissed successfully');
+          fetchAdminData(); // Refresh the data
+          setShowReviewModal(false);
+          setShowConfirmDialog(false);
+          setSelectedFlag(null);
+          setActionNote('');
+          setConfirmAction('');
+        } else {
+          alert('Error dismissing flag');
+        }
+      } else if (action === 'warn' || action === 'suspend' || action === 'ban') {
+        // Call admin action endpoint (to be created)
+        const response = await fetch(`${API_BASE_URL}/admin/user-action`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: targetUserId,
+            userType: targetUserType,
+            action: action.toUpperCase(),
+            reason: selectedFlag.reason,
+            adminNote: actionNote || `Action taken due to flagged message: ${selectedFlag.reason}`,
+            flagId: selectedFlag.id
+          })
+        });
+
+        if (response.ok) {
+          // Update the flag status
+          await fetch(`${API_BASE_URL}/flagged-messages/${selectedFlag.id}/status`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              status: 'ACTION_TAKEN',
+              reviewedBy: 1, // TODO: Replace with actual admin user ID
+              adminNote: actionNote || `${action.toUpperCase()} action taken`
+            })
+          });
+
+          alert(`User ${action}ed successfully`);
+          fetchAdminData(); // Refresh the data
+          setShowReviewModal(false);
+          setShowConfirmDialog(false);
+          setSelectedFlag(null);
+          setActionNote('');
+          setConfirmAction('');
+        } else {
+          const errorData = await response.json();
+          alert(`Error: ${errorData.error || 'Failed to perform action'}`);
+        }
+      } else if (action === 'delete') {
+        // Delete the message (to be implemented in backend)
+        const response = await fetch(`${API_BASE_URL}/admin/delete-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            flagId: selectedFlag.id,
+            messageId: selectedFlag.messageId,
+            adminNote: actionNote || 'Message deleted due to TOS violation'
+          })
+        });
+
+        if (response.ok) {
+          // Update the flag status
+          await fetch(`${API_BASE_URL}/flagged-messages/${selectedFlag.id}/status`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              status: 'ACTION_TAKEN',
+              reviewedBy: 1, // TODO: Replace with actual admin user ID
+              adminNote: actionNote || 'Message deleted'
+            })
+          });
+
+          alert('Message deleted successfully');
+          fetchAdminData(); // Refresh the data
+          setShowReviewModal(false);
+          setShowConfirmDialog(false);
+          setSelectedFlag(null);
+          setActionNote('');
+          setConfirmAction('');
+        } else {
+          alert('Error deleting message');
+        }
+      }
+    } catch (error) {
+      console.error('Error performing admin action:', error);
+      alert('An error occurred while performing the action');
     }
   };
 
@@ -492,25 +643,25 @@ const AdminDashboard: React.FC = () => {
               Loading flagged messages...
             </p>
           </div>
-        ) : messages && messages.length > 0 ? (
+        ) : flaggedMessages && flaggedMessages.length > 0 ? (
           <div style={{
             display: 'grid',
             gap: '16px'
           }}>
-            {messages.map((msg: any) => (
+            {flaggedMessages.map((flag) => (
             <div
-              key={msg.id}
+              key={flag.id}
               style={{
                 backgroundColor: 'white',
                 borderRadius: '12px',
                 padding: '24px',
-                border: msg.flagged ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                border: flag.status === 'PENDING' ? '2px solid #ef4444' : '1px solid #e2e8f0',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 cursor: 'pointer'
               }}
               onClick={() => {
-                setSelectedConversation(msg.conversationId);
-                setShowMessagesModal(true);
+                setSelectedFlag(flag);
+                setShowReviewModal(true);
               }}
             >
               <div style={{
@@ -527,31 +678,58 @@ const AdminDashboard: React.FC = () => {
                     margin: 0,
                     marginBottom: '4px'
                   }}>
-                    {msg.clientName} ↔ {msg.contractorName}
+                    {flag.client.firstName} {flag.client.lastName} ↔ {flag.contractor.name}
                   </h3>
                   <p style={{
                     fontSize: '14px',
                     color: '#64748b',
                     margin: 0
                   }}>
-                    1 messages
+                    Flagged by: {flag.flaggedBy}
                   </p>
                 </div>
-                {msg.flagged && (
-                  <div style={{
-                    padding: '6px 12px',
-                    backgroundColor: '#fee2e2',
-                    color: '#991b1b',
-                    borderRadius: '6px',
+                <div style={{
+                  padding: '6px 12px',
+                  backgroundColor: flag.status === 'PENDING' ? '#fee2e2' :
+                                   flag.status === 'REVIEWED' ? '#dbeafe' :
+                                   flag.status === 'ACTION_TAKEN' ? '#dcfce7' : '#f1f5f9',
+                  color: flag.status === 'PENDING' ? '#991b1b' :
+                         flag.status === 'REVIEWED' ? '#1e40af' :
+                         flag.status === 'ACTION_TAKEN' ? '#166534' : '#475569',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <AlertTriangle size={14} />
+                  {flag.status}
+                </div>
+              </div>
+              <div style={{
+                backgroundColor: '#fef2f2',
+                padding: '12px',
+                borderRadius: '8px',
+                marginBottom: '12px'
+              }}>
+                <p style={{
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  color: '#991b1b',
+                  margin: 0,
+                  marginBottom: '4px'
+                }}>
+                  Reason: {flag.reason}
+                </p>
+                {flag.details && (
+                  <p style={{
                     fontSize: '13px',
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
+                    color: '#7f1d1d',
+                    margin: 0
                   }}>
-                    <AlertTriangle size={14} />
-                    FLAGGED
-                  </div>
+                    Details: {flag.details}
+                  </p>
                 )}
               </div>
               <p style={{
@@ -560,14 +738,14 @@ const AdminDashboard: React.FC = () => {
                 margin: 0,
                 marginBottom: '8px'
               }}>
-                "{msg.message}"
+                "{flag.messageText}"
               </p>
               <p style={{
                 fontSize: '13px',
                 color: '#94a3b8',
                 margin: 0
               }}>
-                Last message: {msg.timestamp}
+                Flagged: {new Date(flag.createdAt).toLocaleString()}
               </p>
             </div>
           ))}
@@ -606,155 +784,161 @@ const AdminDashboard: React.FC = () => {
         color: '#64748b',
         marginBottom: '24px'
       }}>
-        Review user-reported violations and suspicious activity
+        Review other types of user reports and violations
       </p>
 
       <div style={{
-        display: 'grid',
-        gap: '16px'
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '64px 48px',
+        textAlign: 'center',
+        border: '2px dashed #e2e8f0'
       }}>
-        {reports.map(report => (
-          <div
-            key={report.id}
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '24px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}
-          >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              marginBottom: '16px'
-            }}>
-              <div>
-                <h3 style={{
-                  fontSize: '18px',
-                  fontWeight: 'bold',
-                  color: '#1e293b',
-                  margin: 0,
-                  marginBottom: '4px'
-                }}>
-                  {report.reason}
-                </h3>
-                <p style={{
-                  fontSize: '14px',
-                  color: '#64748b',
-                  margin: 0
-                }}>
-                  Reported by: <strong>{report.reportedBy}</strong> against <strong>{report.reportedUser}</strong>
-                </p>
-              </div>
-              <div style={{
-                padding: '6px 12px',
-                backgroundColor: `${getStatusColor(report.status)}15`,
-                color: getStatusColor(report.status),
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: 'bold'
-              }}>
-                {report.status.toUpperCase()}
-              </div>
-            </div>
+        <AlertTriangle
+          size={64}
+          style={{
+            color: '#cbd5e1',
+            margin: '0 auto 24px',
+            display: 'block'
+          }}
+        />
 
+        <h3 style={{
+          fontSize: '20px',
+          fontWeight: 'bold',
+          color: '#1e293b',
+          margin: 0,
+          marginBottom: '12px'
+        }}>
+          Coming Soon
+        </h3>
+
+        <p style={{
+          fontSize: '15px',
+          color: '#64748b',
+          margin: 0,
+          marginBottom: '24px',
+          maxWidth: '600px',
+          marginLeft: 'auto',
+          marginRight: 'auto',
+          lineHeight: '1.6'
+        }}>
+          This section will allow you to review and manage other types of reports including:
+        </p>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '16px',
+          maxWidth: '700px',
+          margin: '0 auto',
+          textAlign: 'left'
+        }}>
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <h4 style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              margin: 0,
+              marginBottom: '4px'
+            }}>
+              User Profile Reports
+            </h4>
             <p style={{
-              fontSize: '15px',
-              color: '#475569',
-              marginBottom: '12px',
-              padding: '16px',
-              backgroundColor: '#f8fafc',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0'
+              fontSize: '13px',
+              color: '#64748b',
+              margin: 0
             }}>
-              {report.description}
+              Reports about contractor or client profiles
             </p>
-
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <p style={{
-                fontSize: '13px',
-                color: '#94a3b8',
-                margin: 0
-              }}>
-                Reported on: {report.timestamp}
-              </p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => {
-                    // TODO: Implement mark as reviewed API call
-                    alert(`Mark report ${report.id} as reviewed`);
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <CheckCircle size={14} />
-                  MARK REVIEWED
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implement mark as resolved API call
-                    alert(`Mark report ${report.id} as resolved`);
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <CheckCircle size={14} />
-                  RESOLVE
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implement dismiss report API call
-                    alert(`Dismiss report ${report.id}`);
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: 'white',
-                    color: '#64748b',
-                    border: '2px solid #e2e8f0',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <XCircle size={14} />
-                  DISMISS
-                </button>
-              </div>
-            </div>
           </div>
-        ))}
+
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <h4 style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              margin: 0,
+              marginBottom: '4px'
+            }}>
+              Booking Disputes
+            </h4>
+            <p style={{
+              fontSize: '13px',
+              color: '#64748b',
+              margin: 0
+            }}>
+              Issues with bookings, cancellations, or no-shows
+            </p>
+          </div>
+
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <h4 style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              margin: 0,
+              marginBottom: '4px'
+            }}>
+              Payment Disputes
+            </h4>
+            <p style={{
+              fontSize: '13px',
+              color: '#64748b',
+              margin: 0
+            }}>
+              Payment issues, refunds, or billing problems
+            </p>
+          </div>
+
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <h4 style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              margin: 0,
+              marginBottom: '4px'
+            }}>
+              Platform Abuse
+            </h4>
+            <p style={{
+              fontSize: '13px',
+              color: '#64748b',
+              margin: 0
+            }}>
+              Spam, fake accounts, or fraudulent activity
+            </p>
+          </div>
+        </div>
+
+        <p style={{
+          fontSize: '13px',
+          color: '#94a3b8',
+          margin: '32px 0 0 0',
+          fontStyle: 'italic'
+        }}>
+          Note: For flagged messages, please use the "Message Monitoring" section.
+        </p>
       </div>
     </div>
   );
@@ -1272,8 +1456,8 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Messages Modal */}
-      {showMessagesModal && selectedConversation && (
+      {/* Enhanced Review Modal */}
+      {showReviewModal && selectedFlag && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -1290,7 +1474,7 @@ const AdminDashboard: React.FC = () => {
             backgroundColor: 'white',
             borderRadius: '16px',
             padding: '32px',
-            maxWidth: '700px',
+            maxWidth: '800px',
             width: '90%',
             maxHeight: '80vh',
             overflowY: 'auto'
@@ -1301,16 +1485,49 @@ const AdminDashboard: React.FC = () => {
               alignItems: 'flex-start',
               marginBottom: '24px'
             }}>
-              <h2 style={{
-                fontSize: '24px',
-                fontWeight: 'bold',
-                color: '#1e293b',
-                margin: 0
-              }}>
-                Conversation Details
-              </h2>
+              <div>
+                <h2 style={{
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  margin: 0,
+                  marginBottom: '8px'
+                }}>
+                  Review Flagged Message
+                </h2>
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'center'
+                }}>
+                  <span style={{
+                    padding: '4px 12px',
+                    backgroundColor: selectedFlag.status === 'PENDING' ? '#fee2e2' :
+                                     selectedFlag.status === 'REVIEWED' ? '#dbeafe' :
+                                     selectedFlag.status === 'ACTION_TAKEN' ? '#dcfce7' : '#f1f5f9',
+                    color: selectedFlag.status === 'PENDING' ? '#991b1b' :
+                           selectedFlag.status === 'REVIEWED' ? '#1e40af' :
+                           selectedFlag.status === 'ACTION_TAKEN' ? '#166534' : '#475569',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}>
+                    {selectedFlag.status}
+                  </span>
+                  <span style={{
+                    fontSize: '14px',
+                    color: '#64748b'
+                  }}>
+                    Flag ID: #{selectedFlag.id}
+                  </span>
+                </div>
+              </div>
               <button
-                onClick={() => setShowMessagesModal(false)}
+                onClick={() => {
+                  setShowReviewModal(false);
+                  setSelectedFlag(null);
+                  setActionNote('');
+                }}
                 style={{
                   padding: '8px',
                   backgroundColor: 'transparent',
@@ -1322,70 +1539,444 @@ const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
+            {/* Conversation Participants */}
             <div style={{
-              display: 'grid',
-              gap: '12px'
+              backgroundColor: '#f8fafc',
+              padding: '16px',
+              borderRadius: '12px',
+              marginBottom: '20px'
             }}>
-              {messages
-                .filter(msg => msg.conversationId === selectedConversation)
-                .map(msg => (
-                  <div
-                    key={msg.id}
-                    style={{
-                      padding: '16px',
-                      backgroundColor: msg.flagged ? '#fee2e2' : '#f8fafc',
-                      borderRadius: '8px',
-                      border: msg.flagged ? '2px solid #ef4444' : '1px solid #e2e8f0'
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '8px'
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                margin: 0,
+                marginBottom: '12px'
+              }}>
+                Conversation Participants
+              </h3>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '16px'
+              }}>
+                <div>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    marginBottom: '4px'
+                  }}>
+                    Client
+                  </p>
+                  <p style={{
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    color: '#1e293b',
+                    margin: 0
+                  }}>
+                    {selectedFlag.client.firstName} {selectedFlag.client.lastName}
+                  </p>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0
+                  }}>
+                    ID: {selectedFlag.clientId}
+                  </p>
+                </div>
+                <div>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    marginBottom: '4px'
+                  }}>
+                    Contractor
+                  </p>
+                  <p style={{
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    color: '#1e293b',
+                    margin: 0
+                  }}>
+                    {selectedFlag.contractor.name}
+                  </p>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0
+                  }}>
+                    ID: {selectedFlag.contractorId}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Flag Details */}
+            <div style={{
+              backgroundColor: '#fef2f2',
+              padding: '16px',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              border: '2px solid #fee2e2'
+            }}>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: '#991b1b',
+                margin: 0,
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <AlertTriangle size={18} />
+                Flag Information
+              </h3>
+              <div style={{
+                display: 'grid',
+                gap: '12px'
+              }}>
+                <div>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    marginBottom: '4px'
+                  }}>
+                    Flagged By
+                  </p>
+                  <p style={{
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    color: '#7f1d1d',
+                    margin: 0
+                  }}>
+                    {selectedFlag.flaggedBy} (User ID: {selectedFlag.flaggedById})
+                  </p>
+                </div>
+                <div>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    marginBottom: '4px'
+                  }}>
+                    Reason
+                  </p>
+                  <p style={{
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    color: '#7f1d1d',
+                    margin: 0
+                  }}>
+                    {selectedFlag.reason}
+                  </p>
+                </div>
+                {selectedFlag.details && (
+                  <div>
+                    <p style={{
+                      fontSize: '13px',
+                      color: '#64748b',
+                      margin: 0,
+                      marginBottom: '4px'
                     }}>
-                      <p style={{
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        color: '#1e293b',
-                        margin: 0
-                      }}>
-                        {msg.sender}
-                      </p>
-                      <p style={{
-                        fontSize: '12px',
-                        color: '#94a3b8',
-                        margin: 0
-                      }}>
-                        {msg.timestamp}
-                      </p>
-                    </div>
+                      Additional Details
+                    </p>
                     <p style={{
                       fontSize: '15px',
-                      color: '#475569',
+                      color: '#7f1d1d',
                       margin: 0
                     }}>
-                      {msg.message}
+                      {selectedFlag.details}
                     </p>
-                    {msg.flagged && (
-                      <div style={{
-                        marginTop: '8px',
-                        padding: '8px 12px',
-                        backgroundColor: '#fee2e2',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        color: '#991b1b',
-                        fontWeight: 'bold',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <AlertTriangle size={14} />
-                        Flagged for review
-                      </div>
-                    )}
                   </div>
-                ))}
+                )}
+                <div>
+                  <p style={{
+                    fontSize: '13px',
+                    color: '#64748b',
+                    margin: 0,
+                    marginBottom: '4px'
+                  }}>
+                    Flagged At
+                  </p>
+                  <p style={{
+                    fontSize: '15px',
+                    color: '#7f1d1d',
+                    margin: 0
+                  }}>
+                    {new Date(selectedFlag.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Flagged Message Content */}
+            <div style={{
+              backgroundColor: '#fff7ed',
+              padding: '16px',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              border: '1px solid #fed7aa'
+            }}>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                margin: 0,
+                marginBottom: '12px'
+              }}>
+                Flagged Message
+              </h3>
+              <p style={{
+                fontSize: '15px',
+                color: '#475569',
+                margin: 0,
+                lineHeight: '1.6',
+                whiteSpace: 'pre-wrap'
+              }}>
+                "{selectedFlag.messageText}"
+              </p>
+            </div>
+
+            {/* Action Note Input */}
+            <div style={{
+              marginBottom: '20px'
+            }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                marginBottom: '8px'
+              }}>
+                Admin Note (Optional)
+              </label>
+              <textarea
+                value={actionNote}
+                onChange={(e) => setActionNote(e.target.value)}
+                placeholder="Add notes about your decision or actions taken..."
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '12px',
+                  fontSize: '14px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '12px'
+            }}>
+              <button
+                onClick={() => {
+                  setConfirmAction('dismiss');
+                  setShowConfirmDialog(true);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#475569',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Dismiss Flag
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmAction('warn');
+                  setShowConfirmDialog(true);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Warn User
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmAction('suspend');
+                  setShowConfirmDialog(true);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#fed7aa',
+                  color: '#9a3412',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Suspend User (7 days)
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmAction('ban');
+                  setShowConfirmDialog(true);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#fecaca',
+                  color: '#991b1b',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Ban User
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmAction('delete');
+                  setShowConfirmDialog(true);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Delete Message
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && confirmAction && selectedFlag && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              margin: 0,
+              marginBottom: '16px'
+            }}>
+              Confirm Action
+            </h3>
+            <p style={{
+              fontSize: '15px',
+              color: '#475569',
+              margin: 0,
+              marginBottom: '24px',
+              lineHeight: '1.6'
+            }}>
+              {confirmAction === 'dismiss' && 'Are you sure you want to dismiss this flag? The flag will be marked as reviewed with no action taken.'}
+              {confirmAction === 'warn' && `Are you sure you want to send a warning to this user? They will receive a notification about their behavior.`}
+              {confirmAction === 'suspend' && `Are you sure you want to suspend this user for 7 days? They will not be able to access their account during this time.`}
+              {confirmAction === 'ban' && `Are you sure you want to permanently ban this user? This action is severe and should only be used for serious violations.`}
+              {confirmAction === 'delete' && 'Are you sure you want to delete this message? This action cannot be undone.'}
+            </p>
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '24px'
+            }}>
+              <p style={{
+                fontSize: '13px',
+                color: '#64748b',
+                margin: 0,
+                marginBottom: '4px'
+              }}>
+                Target User:
+              </p>
+              <p style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                margin: 0
+              }}>
+                {selectedFlag.flaggedBy === 'CLIENT'
+                  ? `${selectedFlag.contractor.name} (Contractor)`
+                  : `${selectedFlag.client.firstName} ${selectedFlag.client.lastName} (Client)`}
+              </p>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px'
+            }}>
+              <button
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  setConfirmAction('');
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#475569',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAdminAction(confirmAction)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: confirmAction === 'ban' || confirmAction === 'delete' ? '#ef4444' : '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>
