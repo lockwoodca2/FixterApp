@@ -9,3 +9,4 @@ dist
 
 # Wrangler local dev vars
 .dev.vars
+.wrangler
