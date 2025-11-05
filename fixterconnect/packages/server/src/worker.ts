@@ -8,7 +8,8 @@ export interface Env {
   DATABASE_URL: string;
   JWT_SECRET: string;
   STRIPE_SECRET_KEY?: string;
-  UPLOADS_BUCKET?: R2Bucket;
+  R2_BUCKET: R2Bucket;
+  R2_PUBLIC_URL: string;
 }
 
 // Define context variables
@@ -66,6 +67,7 @@ import messagesRoutes from './routes-hono/messages.js';
 import invoicesRoutes from './routes-hono/invoices.js';
 import adminRoutes from './routes-hono/admin.js';
 import availabilityRoutes from './routes-hono/availability.js';
+import uploadsRoutes from './routes-hono/uploads.js';
 
 // Register routes
 app.route('/api', authRoutes);
@@ -77,9 +79,7 @@ app.route('/api', messagesRoutes);
 app.route('/api', invoicesRoutes);
 app.route('/api', adminRoutes);
 app.route('/api', availabilityRoutes);
-
-// TODO: Convert uploads routes and migrate to R2
-// app.route('/api', uploadRoutes);
+app.route('/api', uploadsRoutes);
 
 // Global error handler
 app.onError((err, c) => {

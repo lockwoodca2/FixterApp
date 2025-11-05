@@ -11,13 +11,14 @@ enabled = true
 NODE_ENV = "production"
 
 # R2 Bucket for file uploads
-# Uncomment after creating R2 bucket: wrangler r2 bucket create fixter-uploads
-# [[r2_buckets]]
-# binding = "UPLOADS_BUCKET"
-# bucket_name = "fixter-uploads"
+# Create bucket with: wrangler r2 bucket create fixterconnect-uploads
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "fixterconnect-uploads"
 
 # Secrets (set via: wrangler secret put SECRET_NAME)
 # Run these commands to set secrets:
 # wrangler secret put DATABASE_URL
 # wrangler secret put JWT_SECRET
 # wrangler secret put STRIPE_SECRET_KEY
+# wrangler secret put R2_PUBLIC_URL
