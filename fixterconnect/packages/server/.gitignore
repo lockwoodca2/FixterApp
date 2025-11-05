@@ -6,3 +6,6 @@ dist
 .DS_Store
 
 /src/generated/prisma
+
+# Wrangler local dev vars
+.dev.vars

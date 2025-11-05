@@ -58,19 +58,27 @@ app.get('/health', (c) => {
 
 // Import Hono route handlers
 import authRoutes from './routes-hono/auth.js';
+import servicesRoutes from './routes-hono/services.js';
+import bookingsRoutes from './routes-hono/bookings.js';
+import profilesRoutes from './routes-hono/profiles.js';
+import favoritesRoutes from './routes-hono/favorites.js';
+import messagesRoutes from './routes-hono/messages.js';
+import invoicesRoutes from './routes-hono/invoices.js';
+import adminRoutes from './routes-hono/admin.js';
+import availabilityRoutes from './routes-hono/availability.js';
 
 // Register routes
 app.route('/api', authRoutes);
+app.route('/api', servicesRoutes);
+app.route('/api', bookingsRoutes);
+app.route('/api', profilesRoutes);
+app.route('/api', favoritesRoutes);
+app.route('/api', messagesRoutes);
+app.route('/api', invoicesRoutes);
+app.route('/api', adminRoutes);
+app.route('/api', availabilityRoutes);
 
-// TODO: Import and register remaining route handlers
-// app.route('/api', servicesRoutes);
-// app.route('/api', bookingsRoutes);
-// app.route('/api', profilesRoutes);
-// app.route('/api', messagesRoutes);
-// app.route('/api', favoritesRoutes);
-// app.route('/api', invoicesRoutes);
-// app.route('/api', adminRoutes);
-// app.route('/api', availabilityRoutes);
+// TODO: Convert uploads routes and migrate to R2
 // app.route('/api', uploadRoutes);
 
 // Global error handler
