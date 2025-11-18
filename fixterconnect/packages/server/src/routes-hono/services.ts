@@ -38,32 +38,27 @@ services.get('/services', async (c) => {
   }
 });
 
-// GET /api/service-areas - Get all unique service areas (cities)
+// GET /api/service-areas - Get all active service areas (managed by admin)
 services.get('/service-areas', async (c) => {
   try {
     const prisma = c.get('prisma');
 
-    // Get all unique service areas from active contractor service areas
-    const serviceAreas = await prisma.contractorServiceArea.findMany({
+    // Get all active service areas from master list
+    const serviceAreas = await prisma.serviceArea.findMany({
       where: {
         isActive: true
       },
       select: {
-        area: true
+        id: true,
+        name: true,
+        state: true
       },
-      distinct: ['area'],
       orderBy: {
-        area: 'asc'
+        name: 'asc'
       }
     });
 
-    // Transform to match the expected format: { id, name }
-    const formattedAreas = serviceAreas.map((sa, index) => ({
-      id: index + 1,
-      name: sa.area
-    }));
-
-    return c.json(formattedAreas);
+    return c.json(serviceAreas);
   } catch (error) {
     console.error('Get service areas error:', error);
     return c.json({

@@ -416,6 +416,19 @@ model Availability {
 // SERVICE AREAS
 // ============================================
 
+// Master list of service areas (managed by admin)
+model ServiceArea {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // City/area name (e.g., "Boise", "Nampa")
+  state     String?  // State abbreviation (e.g., "ID", "WA")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("service_areas")
+}
+
 // Tracks which areas a contractor serves on which days
 model ContractorServiceArea {
   id              Int       @id @default(autoincrement())

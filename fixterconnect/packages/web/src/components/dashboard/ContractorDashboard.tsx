@@ -100,6 +100,7 @@ const ContractorDashboard: React.FC = () => {
   const [materials, setMaterials] = useState<any[]>([]);
   const [allServices, setAllServices] = useState<any[]>([]);
   const [contractorServices, setContractorServices] = useState<number[]>([]);
+  const [allServiceAreas, setAllServiceAreas] = useState<any[]>([]); // Master list from admin
   const [contractorAreas, setContractorAreas] = useState<string[]>([]);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
@@ -117,7 +118,6 @@ const ContractorDashboard: React.FC = () => {
     yearsInBusiness: '',
     location: ''
   });
-  const [newArea, setNewArea] = useState('');
 
   useEffect(() => {
     if (user?.id) {
@@ -2817,6 +2817,13 @@ const ContractorDashboard: React.FC = () => {
         setAllServices(servicesData.services);
       }
 
+      // Load all available service areas (master list from admin)
+      const allAreasResponse = await fetch(`${API_BASE_URL}/service-areas`);
+      const allAreasData = await allAreasResponse.json();
+      if (Array.isArray(allAreasData)) {
+        setAllServiceAreas(allAreasData);
+      }
+
       // Load contractor's services
       const contractorServicesResponse = await fetch(`${API_BASE_URL}/contractor-services/${user.id}`);
       const contractorServicesData = await contractorServicesResponse.json();
@@ -2909,35 +2916,13 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
-  const handleAddArea = async () => {
-    if (!newArea.trim() || !user?.id) return;
-
-    const updatedAreas = [...contractorAreas, newArea.trim()];
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/contractor/areas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractorId: user.id,
-          areas: updatedAreas
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setContractorAreas(updatedAreas);
-        setNewArea('');
-      }
-    } catch (error) {
-      console.error('Error adding area:', error);
-    }
-  };
-
-  const handleRemoveArea = async (areaToRemove: string) => {
+  const handleToggleArea = async (areaName: string) => {
     if (!user?.id) return;
 
-    const updatedAreas = contractorAreas.filter(area => area !== areaToRemove);
+    const isSelected = contractorAreas.includes(areaName);
+    const updatedAreas = isSelected
+      ? contractorAreas.filter(area => area !== areaName)
+      : [...contractorAreas, areaName];
 
     try {
       const response = await fetch(`${API_BASE_URL}/contractor/areas`, {
@@ -2954,7 +2939,7 @@ const ContractorDashboard: React.FC = () => {
         setContractorAreas(updatedAreas);
       }
     } catch (error) {
-      console.error('Error removing area:', error);
+      console.error('Error updating service areas:', error);
     }
   };
 
@@ -3395,77 +3380,43 @@ const ContractorDashboard: React.FC = () => {
     <div>
       <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Service Areas</h3>
       <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
-        Manage the cities and areas where you provide services
+        Select the cities and areas where you provide services
       </p>
 
-      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px' }}>
-        <input
-          type="text"
-          value={newArea}
-          onChange={(e) => setNewArea(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleAddArea()}
-          placeholder="Enter city or zip code"
-          style={{
-            flex: 1,
-            padding: '12px',
-            border: '2px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '16px'
-          }}
-        />
-        <button
-          onClick={handleAddArea}
-          style={{
-            padding: '12px 24px',
-            borderRadius: '8px',
-            border: 'none',
-            backgroundColor: '#10b981',
-            color: 'white',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Add Area
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-        {contractorAreas.map((area, index) => (
-          <div
-            key={index}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+        {allServiceAreas.map((area) => (
+          <label
+            key={area.id}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
-              backgroundColor: '#f1f5f9',
-              borderRadius: '20px',
-              fontSize: '14px',
-              fontWeight: '500'
+              padding: '12px',
+              border: `2px solid ${contractorAreas.includes(area.name) ? '#6366f1' : '#e2e8f0'}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              backgroundColor: contractorAreas.includes(area.name) ? '#eef2ff' : 'white',
+              transition: 'all 0.2s'
             }}
           >
-            <MapPin size={16} style={{ color: '#64748b' }} />
-            <span>{area}</span>
-            <button
-              onClick={() => handleRemoveArea(area)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '0',
-                marginLeft: '4px'
-              }}
-            >
-              <X size={16} style={{ color: '#ef4444' }} />
-            </button>
-          </div>
+            <input
+              type="checkbox"
+              checked={contractorAreas.includes(area.name)}
+              onChange={() => handleToggleArea(area.name)}
+              style={{ marginRight: '12px', width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MapPin size={16} style={{ color: '#64748b' }} />
+              <span style={{ fontSize: '16px', fontWeight: '500' }}>
+                {area.name}{area.state ? `, ${area.state}` : ''}
+              </span>
+            </div>
+          </label>
         ))}
       </div>
 
-      {contractorAreas.length === 0 && (
+      {allServiceAreas.length === 0 && (
         <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '14px', padding: '32px' }}>
-          No service areas added yet. Add areas where you provide services.
+          No service areas available. Contact admin to add service areas.
         </p>
       )}
     </div>
