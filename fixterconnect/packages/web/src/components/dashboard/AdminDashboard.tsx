@@ -1216,15 +1216,16 @@ const AdminDashboard: React.FC = () => {
                 <button
                   onClick={async () => {
                     try {
+                      console.log('Toggling service:', service);
                       const response = await fetch(`/api/admin/services/${service.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          name: service.name,
-                          description: service.description,
                           isActive: !service.active
                         })
                       });
+
+                      console.log('Response status:', response.status);
 
                       if (response.ok) {
                         const updatedServices = services.map(s =>
@@ -1232,8 +1233,14 @@ const AdminDashboard: React.FC = () => {
                         );
                         setServices(updatedServices);
                       } else {
-                        const error = await response.json();
-                        alert(error.error || 'Failed to update service');
+                        const errorText = await response.text();
+                        console.error('Error response:', errorText);
+                        try {
+                          const error = JSON.parse(errorText);
+                          alert(error.error || 'Failed to update service');
+                        } catch {
+                          alert(`Failed to update service: ${errorText}`);
+                        }
                       }
                     } catch (error) {
                       console.error('Toggle service error:', error);
