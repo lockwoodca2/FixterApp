@@ -273,4 +273,129 @@ admin.get('/admin/activity-logs', async (c) => {
   }
 });
 
+// ============================================
+// SERVICE AREAS MANAGEMENT (Admin only)
+// ============================================
+
+// GET /admin/service-areas - Get all service areas (including inactive)
+admin.get('/admin/service-areas', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+
+    const serviceAreas = await prisma.serviceArea.findMany({
+      orderBy: {
+        name: 'asc'
+      }
+    });
+
+    return c.json({
+      success: true,
+      serviceAreas
+    });
+  } catch (error) {
+    console.error('Error fetching service areas:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch service areas'
+    }, 500);
+  }
+});
+
+// POST /admin/service-areas - Create a new service area
+admin.post('/admin/service-areas', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { name, state } = await c.req.json();
+
+    if (!name) {
+      return c.json({
+        success: false,
+        error: 'Service area name is required'
+      }, 400);
+    }
+
+    // Check if area already exists
+    const existing = await prisma.serviceArea.findUnique({
+      where: { name }
+    });
+
+    if (existing) {
+      return c.json({
+        success: false,
+        error: 'Service area already exists'
+      }, 400);
+    }
+
+    const serviceArea = await prisma.serviceArea.create({
+      data: {
+        name,
+        state: state || null
+      }
+    });
+
+    return c.json({
+      success: true,
+      serviceArea
+    }, 201);
+  } catch (error) {
+    console.error('Error creating service area:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to create service area'
+    }, 500);
+  }
+});
+
+// PUT /admin/service-areas/:id - Update a service area
+admin.put('/admin/service-areas/:id', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { id } = c.req.param();
+    const { name, state, isActive } = await c.req.json();
+
+    const serviceArea = await prisma.serviceArea.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(state !== undefined && { state }),
+        ...(isActive !== undefined && { isActive })
+      }
+    });
+
+    return c.json({
+      success: true,
+      serviceArea
+    });
+  } catch (error) {
+    console.error('Error updating service area:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to update service area'
+    }, 500);
+  }
+});
+
+// DELETE /admin/service-areas/:id - Delete a service area
+admin.delete('/admin/service-areas/:id', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { id } = c.req.param();
+
+    await prisma.serviceArea.delete({
+      where: { id: parseInt(id) }
+    });
+
+    return c.json({
+      success: true,
+      message: 'Service area deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting service area:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to delete service area'
+    }, 500);
+  }
+});
+
 export default admin;

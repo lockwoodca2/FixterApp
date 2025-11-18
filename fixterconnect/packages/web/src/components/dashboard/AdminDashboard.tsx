@@ -17,10 +17,11 @@ import {
   Plus,
   Edit,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  MapPin
 } from 'react-feather';
 
-type AdminSection = 'users' | 'messages' | 'reports' | 'activity' | 'services';
+type AdminSection = 'users' | 'messages' | 'reports' | 'activity' | 'services' | 'service-areas';
 type UserType = 'client' | 'contractor';
 
 interface User {
@@ -114,6 +115,12 @@ const AdminDashboard: React.FC = () => {
   const [reports] = useState<Report[]>([]); // Keep empty for now
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
+  // Service Areas state
+  const [serviceAreas, setServiceAreas] = useState<any[]>([]);
+  const [showAddAreaModal, setShowAddAreaModal] = useState(false);
+  const [editingArea, setEditingArea] = useState<any>(null);
+  const [areaForm, setAreaForm] = useState({ name: '', state: '' });
+
   // Fetch admin data when authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -151,6 +158,13 @@ const AdminDashboard: React.FC = () => {
       const logsData = await logsResponse.json();
       if (logsData.success) {
         setActivityLogs(logsData.logs);
+      }
+
+      // Fetch service areas
+      const areasResponse = await fetch(`${API_BASE_URL}/admin/service-areas`);
+      const areasData = await areasResponse.json();
+      if (areasData.success) {
+        setServiceAreas(areasData.serviceAreas);
       }
 
     } catch (error) {
@@ -395,6 +409,7 @@ const AdminDashboard: React.FC = () => {
   const menuItems = [
     { id: 'users' as AdminSection, label: 'User Management', icon: Users },
     { id: 'services' as AdminSection, label: 'Services Management', icon: Briefcase },
+    { id: 'service-areas' as AdminSection, label: 'Service Areas', icon: MapPin },
     { id: 'messages' as AdminSection, label: 'Message Monitoring', icon: MessageSquare },
     { id: 'reports' as AdminSection, label: 'Reports & Flags', icon: AlertTriangle },
     { id: 'activity' as AdminSection, label: 'Activity Logs', icon: Activity }
@@ -1257,6 +1272,416 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
+  // Service Areas Management Section
+  const renderServiceAreasManagement = () => {
+    const handleSaveArea = async () => {
+      try {
+        if (!areaForm.name.trim()) {
+          alert('Please enter an area name');
+          return;
+        }
+
+        if (editingArea) {
+          // Update existing area
+          const response = await fetch(`/api/admin/service-areas/${editingArea.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(areaForm)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setServiceAreas(serviceAreas.map(a =>
+              a.id === editingArea.id ? data.serviceArea : a
+            ));
+            setShowAddAreaModal(false);
+            setEditingArea(null);
+            setAreaForm({ name: '', state: '' });
+          } else {
+            const error = await response.json();
+            alert(error.error || 'Failed to update service area');
+          }
+        } else {
+          // Create new area
+          const response = await fetch('/api/admin/service-areas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(areaForm)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setServiceAreas([...serviceAreas, data.serviceArea]);
+            setShowAddAreaModal(false);
+            setAreaForm({ name: '', state: '' });
+          } else {
+            const error = await response.json();
+            alert(error.error || 'Failed to create service area');
+          }
+        }
+      } catch (error) {
+        console.error('Save service area error:', error);
+        alert('Failed to save service area');
+      }
+    };
+
+    const handleDeleteArea = async (area: any) => {
+      if (!window.confirm(`Delete "${area.name}"? This will remove it from all contractors. This cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/admin/service-areas/${area.id}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          setServiceAreas(serviceAreas.filter(a => a.id !== area.id));
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Failed to delete service area');
+        }
+      } catch (error) {
+        console.error('Delete service area error:', error);
+        alert('Failed to delete service area');
+      }
+    };
+
+    const handleToggleAreaActive = async (area: any) => {
+      try {
+        const response = await fetch(`/api/admin/service-areas/${area.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: area.name,
+            state: area.state,
+            isActive: !area.isActive
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setServiceAreas(serviceAreas.map(a =>
+            a.id === area.id ? data.serviceArea : a
+          ));
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Failed to update service area');
+        }
+      } catch (error) {
+        console.error('Toggle service area error:', error);
+        alert('Failed to update service area');
+      }
+    };
+
+    return (
+      <div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '32px'
+        }}>
+          <div>
+            <h2 style={{
+              fontSize: '28px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              marginBottom: '8px'
+            }}>
+              Service Areas Management
+            </h2>
+            <p style={{
+              fontSize: '16px',
+              color: '#64748b'
+            }}>
+              Manage cities and areas where contractors can provide services
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setEditingArea(null);
+              setAreaForm({ name: '', state: '' });
+              setShowAddAreaModal(true);
+            }}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <Plus size={18} />
+            ADD SERVICE AREA
+          </button>
+        </div>
+
+        {/* Service Areas Table */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '24px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse'
+          }}>
+            <thead>
+              <tr style={{
+                backgroundColor: '#f8fafc',
+                borderBottom: '2px solid #e2e8f0'
+              }}>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>Area Name</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>State</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>Status</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {serviceAreas.map(area => (
+                <tr key={area.id} style={{
+                  borderBottom: '1px solid #e2e8f0'
+                }}>
+                  <td style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={16} color="#64748b" />
+                      <span style={{ fontSize: '15px', color: '#1e293b', fontWeight: '500' }}>
+                        {area.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '16px', fontSize: '14px', color: '#64748b' }}>
+                    {area.state || '—'}
+                  </td>
+                  <td style={{ padding: '16px' }}>
+                    <span style={{
+                      padding: '4px 12px',
+                      backgroundColor: area.isActive ? '#dcfce7' : '#fee2e2',
+                      color: area.isActive ? '#166534' : '#991b1b',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '600'
+                    }}>
+                      {area.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          setEditingArea(area);
+                          setAreaForm({ name: area.name, state: area.state || '' });
+                          setShowAddAreaModal(true);
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          backgroundColor: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Edit size={14} />
+                        EDIT
+                      </button>
+                      <button
+                        onClick={() => handleToggleAreaActive(area)}
+                        style={{
+                          padding: '8px 12px',
+                          backgroundColor: area.isActive ? '#f59e0b' : '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        {area.isActive ? <ToggleLeft size={14} /> : <ToggleRight size={14} />}
+                        {area.isActive ? 'DEACTIVATE' : 'ACTIVATE'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteArea(area)}
+                        style={{
+                          padding: '8px 12px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Trash2 size={14} />
+                        DELETE
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {serviceAreas.length === 0 && (
+            <div style={{
+              textAlign: 'center',
+              padding: '48px 24px',
+              color: '#64748b'
+            }}>
+              <MapPin size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+              <p style={{ fontSize: '16px', margin: 0 }}>No service areas yet. Add your first one!</p>
+            </div>
+          )}
+        </div>
+
+        {/* Add/Edit Service Area Modal */}
+        {showAddAreaModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%'
+            }}>
+              <h3 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                marginBottom: '24px'
+              }}>
+                {editingArea ? 'Edit Service Area' : 'Add Service Area'}
+              </h3>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  marginBottom: '8px'
+                }}>
+                  Area Name *
+                </label>
+                <input
+                  type="text"
+                  value={areaForm.name}
+                  onChange={(e) => setAreaForm({ ...areaForm, name: e.target.value })}
+                  placeholder="e.g., Boise, Nampa, Meridian"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  marginBottom: '8px'
+                }}>
+                  State (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={areaForm.state}
+                  onChange={(e) => setAreaForm({ ...areaForm, state: e.target.value })}
+                  placeholder="e.g., ID, WA, OR"
+                  maxLength={2}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    boxSizing: 'border-box',
+                    textTransform: 'uppercase'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowAddAreaModal(false);
+                    setEditingArea(null);
+                    setAreaForm({ name: '', state: '' });
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#e2e8f0',
+                    color: '#1e293b',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={handleSaveArea}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {editingArea ? 'UPDATE' : 'ADD'} AREA
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -1352,6 +1777,7 @@ const AdminDashboard: React.FC = () => {
       }}>
         {activeSection === 'users' && renderUserManagement()}
         {activeSection === 'services' && renderServicesManagement()}
+        {activeSection === 'service-areas' && renderServiceAreasManagement()}
         {activeSection === 'messages' && renderMessageMonitoring()}
         {activeSection === 'reports' && renderReports()}
         {activeSection === 'activity' && renderActivityLogs()}
