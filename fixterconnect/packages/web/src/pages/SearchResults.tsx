@@ -61,12 +61,14 @@ const SearchResults: React.FC = () => {
 
       // Try to load from API
       try {
-        const servicesData = await apiClient.getServices();
-        setServices(servicesData);
+        // Load services and service areas in parallel
+        const [servicesData, areasData] = await Promise.all([
+          apiClient.getServices(),
+          apiClient.getServiceAreas()
+        ]);
 
-        // Extract unique service areas from contractors (no dedicated endpoint yet)
-        const uniqueAreas = new Set<string>();
-        const areasData: ServiceArea[] = [];
+        setServices(servicesData);
+        setServiceAreas(areasData);
 
         // Load contractors - either filtered by service or all contractors
         let contractorsData;
@@ -106,24 +108,6 @@ const SearchResults: React.FC = () => {
               : []
           }));
 
-          // Extract unique service areas from contractors
-          contractors.forEach(contractor => {
-            if (contractor.serviceAreas && Array.isArray(contractor.serviceAreas)) {
-              contractor.serviceAreas.forEach((sa: any) => {
-                if (sa.area) {
-                  uniqueAreas.add(sa.area);
-                }
-              });
-            }
-          });
-
-          // Convert to ServiceArea array
-          let id = 1;
-          uniqueAreas.forEach(areaName => {
-            areasData.push({ id: id++, name: areaName });
-          });
-
-          setServiceAreas(areasData);
           setContractors(normalizedContractors);
         }
       } catch (apiError) {

@@ -38,6 +38,41 @@ services.get('/services', async (c) => {
   }
 });
 
+// GET /api/service-areas - Get all unique service areas (cities)
+services.get('/service-areas', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+
+    // Get all unique service areas from active contractor service areas
+    const serviceAreas = await prisma.contractorServiceArea.findMany({
+      where: {
+        isActive: true
+      },
+      select: {
+        area: true
+      },
+      distinct: ['area'],
+      orderBy: {
+        area: 'asc'
+      }
+    });
+
+    // Transform to match the expected format: { id, name }
+    const formattedAreas = serviceAreas.map((sa, index) => ({
+      id: index + 1,
+      name: sa.area
+    }));
+
+    return c.json(formattedAreas);
+  } catch (error) {
+    console.error('Get service areas error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch service areas'
+    }, 500);
+  }
+});
+
 // GET /api/services/:id - Get service by ID
 services.get('/services/:id', async (c) => {
   try {
