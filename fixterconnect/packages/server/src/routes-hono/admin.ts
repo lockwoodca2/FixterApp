@@ -86,7 +86,7 @@ admin.get('/admin/services', async (c) => {
       name: service.name,
       category: 'General', // TODO: Add category field to schema
       description: service.description || '',
-      active: true, // All services are active by default
+      active: service.isActive,
       contractorCount: service.contractors.length
     }));
 
@@ -157,13 +157,14 @@ admin.put('/admin/services/:id', async (c) => {
   try {
     const prisma = c.get('prisma');
     const { id } = c.req.param();
-    const { name, description } = await c.req.json();
+    const { name, description, isActive } = await c.req.json();
 
     const service = await prisma.service.update({
       where: { id: parseInt(id) },
       data: {
-        name,
-        description
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(isActive !== undefined && { isActive })
       }
     });
 

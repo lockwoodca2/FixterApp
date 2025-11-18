@@ -1214,12 +1214,31 @@ const AdminDashboard: React.FC = () => {
                   EDIT
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: Implement toggle active status
-                    const updatedServices = services.map(s =>
-                      s.id === service.id ? { ...s, active: !s.active } : s
-                    );
-                    setServices(updatedServices);
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/admin/services/${service.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: service.name,
+                          description: service.description,
+                          isActive: !service.active
+                        })
+                      });
+
+                      if (response.ok) {
+                        const updatedServices = services.map(s =>
+                          s.id === service.id ? { ...s, active: !s.active } : s
+                        );
+                        setServices(updatedServices);
+                      } else {
+                        const error = await response.json();
+                        alert(error.error || 'Failed to update service');
+                      }
+                    } catch (error) {
+                      console.error('Toggle service error:', error);
+                      alert('Failed to update service');
+                    }
                   }}
                   style={{
                     flex: 1,
