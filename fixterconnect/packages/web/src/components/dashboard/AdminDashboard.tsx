@@ -1217,7 +1217,7 @@ const AdminDashboard: React.FC = () => {
                   onClick={async () => {
                     try {
                       console.log('Toggling service:', service);
-                      const response = await fetch(`/api/admin/services/${service.id}`, {
+                      const response = await fetch(`${API_BASE_URL}/admin/services/${service.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
