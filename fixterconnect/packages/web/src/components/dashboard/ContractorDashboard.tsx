@@ -95,6 +95,30 @@ const ContractorDashboard: React.FC = () => {
   const [flagReason, setFlagReason] = useState('');
   const [flagDetails, setFlagDetails] = useState('');
 
+  // Settings states
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials'>('profile');
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [allServices, setAllServices] = useState<any[]>([]);
+  const [contractorServices, setContractorServices] = useState<number[]>([]);
+  const [contractorAreas, setContractorAreas] = useState<string[]>([]);
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<any>(null);
+  const [materialForm, setMaterialForm] = useState({
+    name: '',
+    price: '',
+    unit: 'each',
+    description: ''
+  });
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    description: '',
+    yearsInBusiness: '',
+    location: ''
+  });
+  const [newArea, setNewArea] = useState('');
+
   useEffect(() => {
     if (user?.id) {
       fetchContractorData();
@@ -2775,75 +2799,793 @@ const ContractorDashboard: React.FC = () => {
     </div>
   );
 
+  // Load settings data when settings tab is active
+  useEffect(() => {
+    if (activeSection === 'settings' && user?.id) {
+      loadSettingsData();
+    }
+  }, [activeSection, user?.id]);
+
+  const loadSettingsData = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Load all services
+      const servicesResponse = await fetch(`${API_BASE_URL}/services`);
+      const servicesData = await servicesResponse.json();
+      if (servicesData.success) {
+        setAllServices(servicesData.services);
+      }
+
+      // Load contractor's services
+      const contractorServicesResponse = await fetch(`${API_BASE_URL}/contractor-services/${user.id}`);
+      const contractorServicesData = await contractorServicesResponse.json();
+      if (Array.isArray(contractorServicesData)) {
+        setContractorServices(contractorServicesData.map((s: any) => s.id));
+      }
+
+      // Load contractor's service areas
+      const areasResponse = await fetch(`${API_BASE_URL}/contractor-areas/${user.id}`);
+      const areasData = await areasResponse.json();
+      if (Array.isArray(areasData)) {
+        setContractorAreas(areasData);
+      }
+
+      // Load materials
+      const materialsResponse = await fetch(`${API_BASE_URL}/materials/${user.id}`);
+      const materialsData = await materialsResponse.json();
+      if (materialsData.success) {
+        setMaterials(materialsData.materials);
+      }
+
+      // Initialize profile form with current profile data
+      if (profile) {
+        setProfileForm({
+          name: profile.name || '',
+          email: profile.email || '',
+          phone: profile.phone || '',
+          description: profile.description || '',
+          yearsInBusiness: profile.yearsInBusiness?.toString() || '',
+          location: profile.location || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error loading settings data:', error);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractors/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileForm.name,
+          email: profileForm.email,
+          phone: profileForm.phone,
+          description: profileForm.description,
+          yearsInBusiness: profileForm.yearsInBusiness ? parseInt(profileForm.yearsInBusiness) : null,
+          location: profileForm.location
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setProfile(data.contractor);
+        alert('Profile updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('Failed to save profile');
+    }
+  };
+
+  const handleToggleService = async (serviceId: number) => {
+    if (!user?.id) return;
+
+    const isSelected = contractorServices.includes(serviceId);
+    const newServices = isSelected
+      ? contractorServices.filter(id => id !== serviceId)
+      : [...contractorServices, serviceId];
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractor/services`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user.id,
+          serviceIds: newServices
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setContractorServices(newServices);
+      }
+    } catch (error) {
+      console.error('Error updating services:', error);
+    }
+  };
+
+  const handleAddArea = async () => {
+    if (!newArea.trim() || !user?.id) return;
+
+    const updatedAreas = [...contractorAreas, newArea.trim()];
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractor/areas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user.id,
+          areas: updatedAreas
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setContractorAreas(updatedAreas);
+        setNewArea('');
+      }
+    } catch (error) {
+      console.error('Error adding area:', error);
+    }
+  };
+
+  const handleRemoveArea = async (areaToRemove: string) => {
+    if (!user?.id) return;
+
+    const updatedAreas = contractorAreas.filter(area => area !== areaToRemove);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractor/areas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user.id,
+          areas: updatedAreas
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setContractorAreas(updatedAreas);
+      }
+    } catch (error) {
+      console.error('Error removing area:', error);
+    }
+  };
+
+  const handleSaveMaterial = async () => {
+    if (!user?.id || !materialForm.name || !materialForm.price || !materialForm.unit) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const url = editingMaterial
+        ? `${API_BASE_URL}/materials/${editingMaterial.id}`
+        : `${API_BASE_URL}/materials`;
+
+      const response = await fetch(url, {
+        method: editingMaterial ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user.id,
+          name: materialForm.name,
+          price: parseFloat(materialForm.price),
+          unit: materialForm.unit,
+          description: materialForm.description
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await loadSettingsData(); // Reload materials
+        setShowMaterialModal(false);
+        setEditingMaterial(null);
+        setMaterialForm({ name: '', price: '', unit: 'each', description: '' });
+      }
+    } catch (error) {
+      console.error('Error saving material:', error);
+      alert('Failed to save material');
+    }
+  };
+
+  const handleDeleteMaterial = async (materialId: number) => {
+    if (!confirm('Are you sure you want to delete this material?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/materials/${materialId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setMaterials(materials.filter(m => m.id !== materialId));
+      }
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      alert('Failed to delete material');
+    }
+  };
+
+  const openEditMaterial = (material: any) => {
+    setEditingMaterial(material);
+    setMaterialForm({
+      name: material.name,
+      price: material.price.toString(),
+      unit: material.unit,
+      description: material.description || ''
+    });
+    setShowMaterialModal(true);
+  };
+
   const renderSettings = () => (
     <div style={{ padding: '24px' }}>
-      <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
+      <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
         Settings
       </h2>
-      {profile && (
+      <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+        Manage your profile, services, and business settings
+      </p>
+
+      {/* Tabs */}
+      <div style={{ borderBottom: '2px solid #e2e8f0', marginBottom: '24px', display: 'flex', gap: '32px' }}>
+        {[
+          { id: 'profile' as const, label: 'Profile' },
+          { id: 'services' as const, label: 'Services' },
+          { id: 'areas' as const, label: 'Service Areas' },
+          { id: 'materials' as const, label: 'Materials Library' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setSettingsTab(tab.id)}
+            style={{
+              padding: '12px 0',
+              background: 'none',
+              border: 'none',
+              fontSize: '16px',
+              fontWeight: '500',
+              color: settingsTab === tab.id ? '#6366f1' : '#64748b',
+              borderBottom: settingsTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
+              marginBottom: '-2px',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+        {settingsTab === 'profile' && renderProfileTab()}
+        {settingsTab === 'services' && renderServicesTab()}
+        {settingsTab === 'areas' && renderAreasTab()}
+        {settingsTab === 'materials' && renderMaterialsTab()}
+      </div>
+
+      {/* Material Modal */}
+      {showMaterialModal && (
         <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
         }}>
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
-              Business Name
-            </label>
-            <input
-              type="text"
-              value={profile.name}
-              readOnly
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '2px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '16px',
-                backgroundColor: '#f8fafc'
-              }}
-            />
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '20px' }}>
+              {editingMaterial ? 'Edit Material' : 'Add Material'}
+            </h3>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+                Material Name *
+              </label>
+              <input
+                type="text"
+                value={materialForm.name}
+                onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '16px'
+                }}
+                placeholder="e.g., Paint, Screws, etc."
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+                Price *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={materialForm.price}
+                onChange={(e) => setMaterialForm({ ...materialForm, price: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '16px'
+                }}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+                Unit *
+              </label>
+              <select
+                value={materialForm.unit}
+                onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '16px'
+                }}
+              >
+                <option value="each">each</option>
+                <option value="gallon">gallon</option>
+                <option value="box">box</option>
+                <option value="sheet">sheet</option>
+                <option value="tube">tube</option>
+                <option value="lb">lb</option>
+                <option value="ft">ft</option>
+                <option value="sqft">sqft</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+                Description
+              </label>
+              <textarea
+                value={materialForm.description}
+                onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  minHeight: '80px',
+                  resize: 'vertical'
+                }}
+                placeholder="Optional description"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowMaterialModal(false);
+                  setEditingMaterial(null);
+                  setMaterialForm({ name: '', price: '', unit: 'each', description: '' });
+                }}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  border: '2px solid #e2e8f0',
+                  backgroundColor: 'white',
+                  color: '#64748b',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveMaterial}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                {editingMaterial ? 'Update' : 'Add'} Material
+              </button>
+            </div>
           </div>
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
-              Email
-            </label>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderProfileTab = () => (
+    <div>
+      <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px' }}>Profile Information</h3>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Business Name
+        </label>
+        <input
+          type="text"
+          value={profileForm.name}
+          onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Email
+        </label>
+        <input
+          type="email"
+          value={profileForm.email}
+          onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Phone
+        </label>
+        <input
+          type="tel"
+          value={profileForm.phone}
+          onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Location
+        </label>
+        <input
+          type="text"
+          value={profileForm.location}
+          onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+          placeholder="e.g., Boise, ID"
+        />
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Years in Business
+        </label>
+        <input
+          type="number"
+          value={profileForm.yearsInBusiness}
+          onChange={(e) => setProfileForm({ ...profileForm, yearsInBusiness: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Description
+        </label>
+        <textarea
+          value={profileForm.description}
+          onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px',
+            minHeight: '100px',
+            resize: 'vertical'
+          }}
+          placeholder="Tell clients about your business..."
+        />
+      </div>
+
+      <button
+        onClick={handleSaveProfile}
+        style={{
+          padding: '12px 32px',
+          borderRadius: '8px',
+          border: 'none',
+          backgroundColor: '#6366f1',
+          color: 'white',
+          fontSize: '16px',
+          fontWeight: '600',
+          cursor: 'pointer'
+        }}
+      >
+        Save Profile
+      </button>
+    </div>
+  );
+
+  const renderServicesTab = () => (
+    <div>
+      <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Services Offered</h3>
+      <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
+        Select the services you offer to clients
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
+        {allServices.map((service) => (
+          <label
+            key={service.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px',
+              border: `2px solid ${contractorServices.includes(service.id) ? '#6366f1' : '#e2e8f0'}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              backgroundColor: contractorServices.includes(service.id) ? '#eef2ff' : 'white',
+              transition: 'all 0.2s'
+            }}
+          >
             <input
-              type="email"
-              value={profile.email || ''}
-              readOnly
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '2px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '16px',
-                backgroundColor: '#f8fafc'
-              }}
+              type="checkbox"
+              checked={contractorServices.includes(service.id)}
+              onChange={() => handleToggleService(service.id)}
+              style={{ marginRight: '12px', width: '18px', height: '18px', cursor: 'pointer' }}
             />
-          </div>
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
-              Phone
-            </label>
-            <input
-              type="tel"
-              value={profile.phone || ''}
-              readOnly
+            <span style={{ fontSize: '16px', fontWeight: '500' }}>{service.name}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderAreasTab = () => (
+    <div>
+      <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '8px' }}>Service Areas</h3>
+      <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
+        Manage the cities and areas where you provide services
+      </p>
+
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '12px' }}>
+        <input
+          type="text"
+          value={newArea}
+          onChange={(e) => setNewArea(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleAddArea()}
+          placeholder="Enter city or zip code"
+          style={{
+            flex: 1,
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+        />
+        <button
+          onClick={handleAddArea}
+          style={{
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            backgroundColor: '#10b981',
+            color: 'white',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Add Area
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+        {contractorAreas.map((area, index) => (
+          <div
+            key={index}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              backgroundColor: '#f1f5f9',
+              borderRadius: '20px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            <MapPin size={16} style={{ color: '#64748b' }} />
+            <span>{area}</span>
+            <button
+              onClick={() => handleRemoveArea(area)}
               style={{
-                width: '100%',
-                padding: '12px',
-                border: '2px solid #e2e8f0',
-                borderRadius: '8px',
-                fontSize: '16px',
-                backgroundColor: '#f8fafc'
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0',
+                marginLeft: '4px'
               }}
-            />
+            >
+              <X size={16} style={{ color: '#ef4444' }} />
+            </button>
           </div>
-          <p style={{ fontSize: '14px', color: '#64748b', fontStyle: 'italic' }}>
-            Full profile editing coming soon
+        ))}
+      </div>
+
+      {contractorAreas.length === 0 && (
+        <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '14px', padding: '32px' }}>
+          No service areas added yet. Add areas where you provide services.
+        </p>
+      )}
+    </div>
+  );
+
+  const renderMaterialsTab = () => (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>Materials Library</h3>
+          <p style={{ fontSize: '14px', color: '#64748b' }}>
+            Manage common materials for job completion and expense tracking
           </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditingMaterial(null);
+            setMaterialForm({ name: '', price: '', unit: 'each', description: '' });
+            setShowMaterialModal(true);
+          }}
+          style={{
+            padding: '12px 24px',
+            borderRadius: '8px',
+            border: 'none',
+            backgroundColor: '#10b981',
+            color: 'white',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          + Add Material
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {materials.map((material) => (
+          <div
+            key={material.id}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}
+          >
+            <div>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
+                {material.name}
+              </h4>
+              <p style={{ fontSize: '14px', color: '#64748b' }}>
+                ${material.price.toFixed(2)} per {material.unit}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => openEditMaterial(material)}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#6366f1',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDeleteMaterial(material.id)}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {materials.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+          <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '16px' }}>
+            No materials in your library yet
+          </p>
+          <button
+            onClick={() => {
+              setEditingMaterial(null);
+              setMaterialForm({ name: '', price: '', unit: 'each', description: '' });
+              setShowMaterialModal(true);
+            }}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '8px',
+              border: '2px solid #e2e8f0',
+              backgroundColor: 'white',
+              color: '#64748b',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Add Your First Material
+          </button>
         </div>
       )}
     </div>

@@ -68,6 +68,7 @@ import invoicesRoutes from './routes-hono/invoices.js';
 import adminRoutes from './routes-hono/admin.js';
 import availabilityRoutes from './routes-hono/availability.js';
 import uploadsRoutes from './routes-hono/uploads.js';
+import materialsRoutes from './routes-hono/materials.js';
 
 // Register routes
 app.route('/api', authRoutes);
@@ -78,6 +79,7 @@ app.route('/api', favoritesRoutes);
 app.route('/api', messagesRoutes);
 app.route('/api', invoicesRoutes);
 app.route('/api', adminRoutes);
+app.route('/api', materialsRoutes);
 app.route('/api', availabilityRoutes);
 app.route('/api', uploadsRoutes);
 
