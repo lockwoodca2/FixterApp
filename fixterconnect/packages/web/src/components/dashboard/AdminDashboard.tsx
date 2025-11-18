@@ -1483,9 +1483,9 @@ const AdminDashboard: React.FC = () => {
                         }}
                         style={{
                           padding: '8px 12px',
-                          backgroundColor: '#3b82f6',
-                          color: 'white',
-                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
                           borderRadius: '6px',
                           fontSize: '13px',
                           fontWeight: 'bold',
@@ -1502,9 +1502,9 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => handleToggleAreaActive(area)}
                         style={{
                           padding: '8px 12px',
-                          backgroundColor: area.isActive ? '#f59e0b' : '#10b981',
-                          color: 'white',
-                          border: 'none',
+                          backgroundColor: 'transparent',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
                           borderRadius: '6px',
                           fontSize: '13px',
                           fontWeight: 'bold',
