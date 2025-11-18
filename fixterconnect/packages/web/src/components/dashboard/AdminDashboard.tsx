@@ -97,6 +97,7 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
+  const [serviceForm, setServiceForm] = useState({ name: '', description: '' });
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
@@ -1050,7 +1051,45 @@ const AdminDashboard: React.FC = () => {
   );
 
   // Services Management Section
-  const renderServicesManagement = () => (
+  const renderServicesManagement = () => {
+    const handleSaveService = async () => {
+      try {
+        if (!serviceForm.name.trim()) {
+          alert('Please enter a service name');
+          return;
+        }
+
+        if (editingService) {
+          // Update existing service
+          const response = await fetch(`${API_BASE_URL}/admin/services/${editingService.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: serviceForm.name,
+              description: serviceForm.description
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setServices(services.map(s =>
+              s.id === editingService.id ? { ...s, name: data.service.name, description: data.service.description } : s
+            ));
+            setShowAddServiceModal(false);
+            setEditingService(null);
+            setServiceForm({ name: '', description: '' });
+          } else {
+            const error = await response.json();
+            alert(error.error || 'Failed to update service');
+          }
+        }
+      } catch (error) {
+        console.error('Save service error:', error);
+        alert('Failed to save service');
+      }
+    };
+
+    return (
     <div>
       <div style={{
         display: 'flex',
@@ -1192,6 +1231,7 @@ const AdminDashboard: React.FC = () => {
                 <button
                   onClick={() => {
                     setEditingService(service);
+                    setServiceForm({ name: service.name, description: service.description });
                     setShowAddServiceModal(true);
                   }}
                   style={{
@@ -1295,8 +1335,132 @@ const AdminDashboard: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Edit Service Modal */}
+      {showAddServiceModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%'
+          }}>
+            <h3 style={{
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: '#1e293b',
+              marginBottom: '24px'
+            }}>
+              Edit Service
+            </h3>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                marginBottom: '8px'
+              }}>
+                Service Name *
+              </label>
+              <input
+                type="text"
+                value={serviceForm.name}
+                onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}
+                placeholder="e.g., Lawn Mowing, Tree Trimming"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                marginBottom: '8px'
+              }}>
+                Description (Optional)
+              </label>
+              <textarea
+                value={serviceForm.description}
+                onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
+                placeholder="Brief description of the service"
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  boxSizing: 'border-box',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowAddServiceModal(false);
+                  setEditingService(null);
+                  setServiceForm({ name: '', description: '' });
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#e2e8f0',
+                  color: '#1e293b',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleSaveService}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                UPDATE SERVICE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  );
+    );
+  };
 
   // Service Areas Management Section
   const renderServiceAreasManagement = () => {
