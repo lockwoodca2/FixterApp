@@ -2995,7 +2995,7 @@ const ContractorDashboard: React.FC = () => {
   };
 
   const handleDeleteMaterial = async (materialId: number) => {
-    if (!confirm('Are you sure you want to delete this material?')) return;
+    if (!window.confirm('Are you sure you want to delete this material?')) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/materials/${materialId}`, {
