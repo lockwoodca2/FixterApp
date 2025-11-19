@@ -44,6 +44,7 @@ const ContractorDashboard: React.FC = () => {
   const [showScheduleChanges, setShowScheduleChanges] = useState(false);
   const [affectedAppointments, setAffectedAppointments] = useState<any[]>([]);
   const [pendingReorder, setPendingReorder] = useState<any[] | null>(null);
+  const [modalAction, setModalAction] = useState<'change' | 'delete'>('change');
 
   // Calendar states
   const [calendarTab, setCalendarTab] = useState<'bookings' | 'schedule'>('bookings');
@@ -376,60 +377,93 @@ const ContractorDashboard: React.FC = () => {
 
   const handleAcceptScheduleChanges = async (notifyCustomers: boolean) => {
     if (editingJobId) {
-      // Handle single job edit - update via API
-      try {
-        const newScheduledTime = `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`;
+      // Check if this is a delete action
+      if (modalAction === 'delete') {
+        try {
+          const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}`, {
+            method: 'DELETE'
+          });
 
-        // Find the job to get scheduledDate
-        const job = todaysJobs.find(j => j.id === editingJobId);
-        if (!job) {
-          setShowScheduleChanges(false);
-          setPendingReorder(null);
-          setAffectedAppointments([]);
-          return;
+          if (!response.ok) {
+            console.error('Failed to delete booking');
+            alert('Failed to delete job. Please try again.');
+            setShowScheduleChanges(false);
+            setPendingReorder(null);
+            setAffectedAppointments([]);
+            return;
+          }
+
+          // Remove from local state
+          setTodaysJobs(todaysJobs.filter(job => job.id !== editingJobId));
+
+          if (notifyCustomers) {
+            // TODO: Send notification to the customer about cancellation
+            console.log('Sending cancellation notification to customer...');
+          }
+
+          setEditingJobId(null);
+          setEditFormData({});
+          alert('Job deleted successfully');
+        } catch (error) {
+          console.error('Error deleting job:', error);
+          alert('Failed to delete job. Please try again.');
         }
+      } else {
+        // Handle time change - update via API
+        try {
+          const newScheduledTime = `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`;
 
-        const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}/schedule`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scheduledDate: job.scheduledDate,
-            scheduledTime: newScheduledTime,
-            estimatedDuration: parseInt(editFormData.duration)
-          })
-        });
+          // Find the job to get scheduledDate
+          const job = todaysJobs.find(j => j.id === editingJobId);
+          if (!job) {
+            setShowScheduleChanges(false);
+            setPendingReorder(null);
+            setAffectedAppointments([]);
+            return;
+          }
 
-        if (!response.ok) {
-          console.error('Failed to update booking schedule');
-          setShowScheduleChanges(false);
-          setPendingReorder(null);
-          setAffectedAppointments([]);
-          return;
+          const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}/schedule`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scheduledDate: job.scheduledDate,
+              scheduledTime: newScheduledTime,
+              estimatedDuration: parseInt(editFormData.duration)
+            })
+          });
+
+          if (!response.ok) {
+            console.error('Failed to update booking schedule');
+            setShowScheduleChanges(false);
+            setPendingReorder(null);
+            setAffectedAppointments([]);
+            return;
+          }
+
+          // Update local state
+          const updatedJobs = todaysJobs.map(j =>
+            j.id === editingJobId
+              ? {
+                  ...j,
+                  scheduledTime: newScheduledTime,
+                  duration: `${editFormData.duration} min`
+                }
+              : j
+          );
+          setTodaysJobs(updatedJobs);
+
+          if (notifyCustomers) {
+            // TODO: Send notification to the customer
+            console.log('Sending notification to customer for job edit...');
+          }
+
+          setEditingJobId(null);
+          setEditFormData({});
+          setTimeSlotConflicts([]);
+          setNextAvailableTime(null);
+        } catch (error) {
+          console.error('Error updating booking schedule:', error);
         }
-
-        // Update local state
-        const updatedJobs = todaysJobs.map(j =>
-          j.id === editingJobId
-            ? {
-                ...j,
-                scheduledTime: newScheduledTime,
-                duration: `${editFormData.duration} min`
-              }
-            : j
-        );
-        setTodaysJobs(updatedJobs);
-
-        if (notifyCustomers) {
-          // TODO: Send notification to the customer
-          console.log('Sending notification to customer for job edit...');
-        }
-
-        setEditingJobId(null);
-        setEditFormData({});
-        setTimeSlotConflicts([]);
-        setNextAvailableTime(null);
-      } catch (error) {
-        console.error('Error updating booking schedule:', error);
       }
     } else if (pendingReorder) {
       // Apply the new schedule with calculated times
@@ -467,39 +501,7 @@ const ContractorDashboard: React.FC = () => {
     setAffectedAppointments([]);
     setEditingJobId(null);
     setEditFormData({});
-  };
-
-  const handleDeleteJob = async (jobId: number) => {
-    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/bookings/${jobId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        console.error('Failed to delete booking');
-        alert('Failed to delete job. Please try again.');
-        return;
-      }
-
-      // Remove from local state
-      setTodaysJobs(todaysJobs.filter(job => job.id !== jobId));
-
-      // Close the modal
-      setShowScheduleChanges(false);
-      setPendingReorder(null);
-      setAffectedAppointments([]);
-      setEditingJobId(null);
-      setEditFormData({});
-
-      alert('Job deleted successfully');
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
-    }
+    setModalAction('change');
   };
 
   // Calendar drag and drop handlers
@@ -598,6 +600,7 @@ const ContractorDashboard: React.FC = () => {
     });
     setTimeSlotConflicts([]);
     setNextAvailableTime(null);
+    setModalAction('change'); // Reset to change mode
     setShowScheduleChanges(true);
   };
 
@@ -3823,26 +3826,101 @@ const ContractorDashboard: React.FC = () => {
               color: '#1e293b',
               marginBottom: '16px'
             }}>
-              Schedule Changes Detected
+              {editingJobId ? 'Manage Appointment' : 'Schedule Changes Detected'}
             </h2>
 
-            <p style={{
-              fontSize: '16px',
-              color: '#64748b',
-              marginBottom: '24px'
-            }}>
-              {editingJobId
-                ? 'Edit the appointment time and duration below. The customer will be notified of changes.'
-                : `Reordering jobs will change ${affectedAppointments.length} appointment time${affectedAppointments.length !== 1 ? 's' : ''}. Review the changes and notify affected customers.`}
-            </p>
+            {/* Toggle for Change Time vs Delete - only show for single job edit */}
+            {editingJobId && (
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                marginBottom: '24px',
+                padding: '4px',
+                backgroundColor: '#f1f5f9',
+                borderRadius: '8px'
+              }}>
+                <button
+                  onClick={() => setModalAction('change')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: modalAction === 'change' ? 'white' : 'transparent',
+                    color: modalAction === 'change' ? '#4f46e5' : '#64748b',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    boxShadow: modalAction === 'change' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  Change Time
+                </button>
+                <button
+                  onClick={() => setModalAction('delete')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: modalAction === 'delete' ? 'white' : 'transparent',
+                    color: modalAction === 'delete' ? '#ef4444' : '#64748b',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    boxShadow: modalAction === 'delete' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                  }}
+                >
+                  Delete Job
+                </button>
+              </div>
+            )}
 
-            {/* Affected Appointments */}
-            <div style={{
-              backgroundColor: '#f8fafc',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '24px'
-            }}>
+            {!editingJobId && (
+              <p style={{
+                fontSize: '16px',
+                color: '#64748b',
+                marginBottom: '24px'
+              }}>
+                Reordering jobs will change {affectedAppointments.length} appointment time{affectedAppointments.length !== 1 ? 's' : ''}. Review the changes and notify affected customers.
+              </p>
+            )}
+
+            {/* Delete Confirmation Message */}
+            {editingJobId && modalAction === 'delete' && (
+              <div style={{
+                backgroundColor: '#fee2e2',
+                border: '1px solid #fca5a5',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
+              }}>
+                <p style={{
+                  fontSize: '16px',
+                  color: '#dc2626',
+                  fontWeight: '600',
+                  marginBottom: '8px'
+                }}>
+                  Are you sure you want to delete this job?
+                </p>
+                <p style={{
+                  fontSize: '14px',
+                  color: '#7f1d1d',
+                  margin: 0
+                }}>
+                  This action cannot be undone. The time slot will be freed and the customer will be notified if you choose to send notifications.
+                </p>
+              </div>
+            )}
+
+            {/* Affected Appointments - only show if not deleting or if reordering */}
+            {(!editingJobId || modalAction === 'change') && (
+              <div style={{
+                backgroundColor: '#f8fafc',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '24px'
+              }}>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -4159,31 +4237,11 @@ const ContractorDashboard: React.FC = () => {
                       <span>•</span>
                       <span>✉️ {appointment.client.email}</span>
                     </div>
-
-                    {/* Delete button - only show in edit mode */}
-                    {editingJobId && (
-                      <button
-                        onClick={() => handleDeleteJob(editingJobId)}
-                        style={{
-                          marginTop: '16px',
-                          padding: '10px 16px',
-                          backgroundColor: '#fee2e2',
-                          color: '#dc2626',
-                          border: '1px solid #fca5a5',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          width: '100%'
-                        }}
-                      >
-                        🗑️ Delete Job
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
             </div>
+            )}
 
             {/* Note */}
             {!editingJobId && (
@@ -4216,15 +4274,10 @@ const ContractorDashboard: React.FC = () => {
                   borderRadius: '8px',
                   fontSize: '15px',
                   fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
+                  cursor: 'pointer'
                 }}
               >
-                <span>✈️</span>
-                ACCEPT & NOTIFY CUSTOMERS
+                {editingJobId && modalAction === 'delete' ? 'DELETE & NOTIFY CUSTOMER' : 'ACCEPT & NOTIFY CUSTOMERS'}
               </button>
 
               <button
@@ -4237,15 +4290,10 @@ const ContractorDashboard: React.FC = () => {
                   borderRadius: '8px',
                   fontSize: '15px',
                   fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
+                  cursor: 'pointer'
                 }}
               >
-                <span>✓</span>
-                ACCEPT SILENTLY (No Notifications)
+                {editingJobId && modalAction === 'delete' ? 'DELETE SILENTLY (No Notifications)' : 'ACCEPT SILENTLY (No Notifications)'}
               </button>
 
               <button
@@ -4261,7 +4309,7 @@ const ContractorDashboard: React.FC = () => {
                   cursor: 'pointer'
                 }}
               >
-                CANCEL (Keep Original Order)
+                {editingJobId ? 'CANCEL' : 'CANCEL (Keep Original Order)'}
               </button>
             </div>
           </div>
