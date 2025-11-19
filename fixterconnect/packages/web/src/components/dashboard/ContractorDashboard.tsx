@@ -3820,14 +3820,40 @@ const ContractorDashboard: React.FC = () => {
             maxHeight: '80vh',
             overflow: 'auto'
           }}>
-            <h2 style={{
-              fontSize: '28px',
-              fontWeight: 'bold',
-              color: '#1e293b',
+            {/* Header with Close Button */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '16px'
             }}>
-              {editingJobId ? 'Manage Appointment' : 'Schedule Changes Detected'}
-            </h2>
+              <h2 style={{
+                fontSize: '28px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                margin: 0
+              }}>
+                {editingJobId ? 'Manage Appointment' : 'Schedule Changes Detected'}
+              </h2>
+              <button
+                onClick={handleCancelScheduleChanges}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748b',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#1e293b'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+              >
+                <X size={24} />
+              </button>
+            </div>
 
             {/* Toggle for Change Time vs Delete - only show for single job edit */}
             {editingJobId && (
