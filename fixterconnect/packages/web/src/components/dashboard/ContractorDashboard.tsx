@@ -3868,10 +3868,11 @@ const ContractorDashboard: React.FC = () => {
                             }}
                             style={{
                               width: '100%',
-                              padding: '10px 12px',
+                              padding: '12px',
                               border: '2px solid #e2e8f0',
                               borderRadius: '8px',
-                              fontSize: '14px'
+                              fontSize: '16px',
+                              fontWeight: '600'
                             }}
                           />
                         </div>
@@ -3904,10 +3905,11 @@ const ContractorDashboard: React.FC = () => {
                             }}
                             style={{
                               width: '100%',
-                              padding: '10px 12px',
+                              padding: '12px',
                               border: '2px solid #e2e8f0',
                               borderRadius: '8px',
-                              fontSize: '14px'
+                              fontSize: '16px',
+                              fontWeight: '600'
                             }}
                           />
                         </div>
