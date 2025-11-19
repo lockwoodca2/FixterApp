@@ -695,25 +695,6 @@ const ContractorDetails: React.FC = () => {
                   </div>
                 )}
 
-                {contractor.licensed && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    backgroundColor: '#d1fae5',
-                    borderRadius: '6px'
-                  }}>
-                    <Award size={18} color="#10b981" />
-                    <span style={{
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      color: '#10b981'
-                    }}>
-                      LICENSED
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* Rating */}
@@ -797,8 +778,8 @@ const ContractorDetails: React.FC = () => {
                     alignItems: 'center',
                     gap: '6px',
                     padding: '6px 12px',
-                    backgroundColor: '#dbeafe',
-                    color: '#1e40af',
+                    backgroundColor: '#d1fae5',
+                    color: '#065f46',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '600'
@@ -813,8 +794,8 @@ const ContractorDetails: React.FC = () => {
                     alignItems: 'center',
                     gap: '6px',
                     padding: '6px 12px',
-                    backgroundColor: '#d1fae5',
-                    color: '#065f46',
+                    backgroundColor: '#dbeafe',
+                    color: '#1e40af',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '600'
@@ -829,8 +810,9 @@ const ContractorDetails: React.FC = () => {
                     alignItems: 'center',
                     gap: '6px',
                     padding: '6px 12px',
-                    backgroundColor: '#fef3c7',
-                    color: '#92400e',
+                    backgroundColor: 'transparent',
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '6px',
                     fontSize: '14px',
                     fontWeight: '600'
