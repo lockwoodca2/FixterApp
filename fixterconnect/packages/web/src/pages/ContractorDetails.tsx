@@ -796,27 +796,28 @@ const ContractorDetails: React.FC = () => {
                   Book Now
                 </button>
 
-                {contractor.googleBusinessUrl && (
-                  <button
-                    onClick={() => window.open(contractor.googleBusinessUrl, '_blank')}
-                    style={{
-                      padding: '14px 28px',
-                      backgroundColor: 'white',
-                      color: '#1e293b',
-                      border: '2px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <ExternalLink size={18} />
-                    Google Reviews
-                  </button>
-                )}
+                <button
+                  onClick={() => contractor.googleBusinessUrl && window.open(contractor.googleBusinessUrl, '_blank')}
+                  disabled={!contractor.googleBusinessUrl}
+                  style={{
+                    padding: '14px 28px',
+                    backgroundColor: contractor.googleBusinessUrl ? 'white' : '#f8fafc',
+                    color: contractor.googleBusinessUrl ? '#1e293b' : '#94a3b8',
+                    border: `2px solid ${contractor.googleBusinessUrl ? '#e2e8f0' : '#e2e8f0'}`,
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: contractor.googleBusinessUrl ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: contractor.googleBusinessUrl ? 1 : 0.6
+                  }}
+                  title={contractor.googleBusinessUrl ? 'View Google Reviews' : 'Google Reviews not available'}
+                >
+                  <ExternalLink size={18} />
+                  Google Reviews
+                </button>
               </div>
             </div>
           </div>

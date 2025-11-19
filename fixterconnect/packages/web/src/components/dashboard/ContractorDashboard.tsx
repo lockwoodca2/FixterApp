@@ -116,7 +116,8 @@ const ContractorDashboard: React.FC = () => {
     phone: '',
     description: '',
     yearsInBusiness: '',
-    location: ''
+    location: '',
+    googleBusinessUrl: ''
   });
 
   useEffect(() => {
@@ -577,18 +578,6 @@ const ContractorDashboard: React.FC = () => {
           }}>
             MAP VIEW
           </button>
-          <button style={{
-            padding: '10px 20px',
-            backgroundColor: '#10b981',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}>
-            + ADD JOB
-          </button>
           <button
             onClick={fetchContractorData}
             style={{
@@ -602,6 +591,18 @@ const ContractorDashboard: React.FC = () => {
             cursor: 'pointer'
           }}>
             REFRESH
+          </button>
+          <button style={{
+            padding: '10px 20px',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}>
+            + ADD JOB
           </button>
         </div>
       </div>
@@ -2853,7 +2854,8 @@ const ContractorDashboard: React.FC = () => {
           phone: profile.phone || '',
           description: profile.description || '',
           yearsInBusiness: profile.yearsInBusiness?.toString() || '',
-          location: profile.location || ''
+          location: profile.location || '',
+          googleBusinessUrl: profile.googleBusinessUrl || ''
         });
       }
     } catch (error) {
@@ -2874,7 +2876,8 @@ const ContractorDashboard: React.FC = () => {
           phone: profileForm.phone,
           description: profileForm.description,
           yearsInBusiness: profileForm.yearsInBusiness ? parseInt(profileForm.yearsInBusiness) : null,
-          location: profileForm.location
+          location: profileForm.location,
+          googleBusinessUrl: profileForm.googleBusinessUrl
         })
       });
 
@@ -3303,7 +3306,7 @@ const ContractorDashboard: React.FC = () => {
         />
       </div>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
           Description
         </label>
@@ -3321,6 +3324,28 @@ const ContractorDashboard: React.FC = () => {
           }}
           placeholder="Tell clients about your business..."
         />
+      </div>
+
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+          Google Business Profile URL
+        </label>
+        <input
+          type="url"
+          value={profileForm.googleBusinessUrl || ''}
+          onChange={(e) => setProfileForm({ ...profileForm, googleBusinessUrl: e.target.value })}
+          style={{
+            width: '100%',
+            padding: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
+          placeholder="https://g.page/your-business or https://maps.app.goo.gl/..."
+        />
+        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '8px', lineHeight: '1.5' }}>
+          Add your Google Business Profile link so clients can read your reviews and find your business on Google Maps
+        </p>
       </div>
 
       <button
