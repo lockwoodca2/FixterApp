@@ -145,7 +145,9 @@ const ContractorDashboard: React.FC = () => {
       const todayJobsResponse = await fetch(`${API_BASE_URL}/bookings/contractor/${user.id}?date=${today}`);
       const todayJobsData = await todayJobsResponse.json();
       if (todayJobsData.success) {
-        setTodaysJobs(todayJobsData.bookings);
+        // Filter out cancelled bookings on the frontend as well (safety check)
+        const activeJobs = todayJobsData.bookings.filter((job: any) => job.status !== 'CANCELLED');
+        setTodaysJobs(activeJobs);
       }
 
       // Fetch all bookings for history
