@@ -39,10 +39,9 @@ const SearchResults: React.FC = () => {
   const [selectedService, setSelectedService] = useState<string>(serviceParam || '');
   const [selectedCity, setSelectedCity] = useState<string>(cityParam || '');
   const [selectedDate, setSelectedDate] = useState<string>(dateParam || '');
-  const [minRating, setMinRating] = useState<number>(0);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [licensedOnly, setLicensedOnly] = useState(false);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [licensedAndInsuredOnly, setLicensedAndInsuredOnly] = useState(false);
+  const [afterHoursOnly, setAfterHoursOnly] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -52,7 +51,7 @@ const SearchResults: React.FC = () => {
   // Apply filters when data or filter values change
   useEffect(() => {
     applyFilters();
-  }, [contractors, selectedService, selectedCity, minRating, verifiedOnly, licensedOnly, selectedDate]);
+  }, [contractors, selectedService, selectedCity, licensedAndInsuredOnly, afterHoursOnly, selectedDate]);
 
 
   const loadData = async () => {
@@ -157,19 +156,16 @@ const SearchResults: React.FC = () => {
       });
     }
 
-    // Filter by rating
-    if (minRating > 0) {
-      filtered = filtered.filter(c => c.rating >= minRating);
+    // Filter by licensed AND insured
+    if (licensedAndInsuredOnly) {
+      filtered = filtered.filter(c =>
+        c.licensed === true && (c as any).insured === true
+      );
     }
 
-    // Filter by verified
-    if (verifiedOnly) {
-      filtered = filtered.filter(c => c.verified === true);
-    }
-
-    // Filter by licensed
-    if (licensedOnly) {
-      filtered = filtered.filter(c => c.licensed === true);
+    // Filter by after-hours availability
+    if (afterHoursOnly) {
+      filtered = filtered.filter(c => (c as any).afterHoursAvailable === true);
     }
 
     // Filter by availability (date)
@@ -222,7 +218,7 @@ const SearchResults: React.FC = () => {
     console.log('FINAL filtered contractors:', filtered.length);
     console.log('=== APPLY FILTERS END ===');
     setFilteredContractors(filtered);
-  }, [contractors, selectedService, selectedCity, minRating, verifiedOnly, licensedOnly, selectedDate]);
+  }, [contractors, selectedService, selectedCity, licensedAndInsuredOnly, afterHoursOnly, selectedDate]);
 
   const handleSearch = async () => {
     if (!selectedService) return;
@@ -249,174 +245,174 @@ const SearchResults: React.FC = () => {
     }
   };
 
-  const renderFilters = () => (
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '24px',
-      border: '1px solid #e2e8f0',
-      position: 'sticky',
-      top: '24px'
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        marginBottom: '24px'
-      }}>
-        <Sliders size={20} color="#667eea" />
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: 'bold',
-          color: '#1e293b',
-          margin: 0
-        }}>
-          Filters
-        </h3>
-      </div>
+  const renderFiltersModal = () => {
+    if (!showFiltersModal) return null;
 
-      {/* Rating Filter */}
-      <div style={{ marginBottom: '24px' }}>
-        <label style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: '#1e293b',
-          marginBottom: '12px'
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          onClick={() => setShowFiltersModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999
+          }}
+        />
+
+        {/* Modal */}
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '24px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+          zIndex: 1000,
+          minWidth: '320px',
+          maxWidth: '90vw'
         }}>
-          <Star size={16} style={{ display: 'inline', marginRight: '6px' }} />
-          Minimum Rating
-        </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[4.5, 4.0, 3.5, 3.0].map(rating => (
-            <label
-              key={rating}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Sliders size={20} color="#667eea" />
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                margin: 0
+              }}>
+                Filters
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowFiltersModal(false)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                color: '#64748b',
                 cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '6px',
-                backgroundColor: minRating === rating ? '#ede9fe' : 'transparent'
+                padding: '4px',
+                lineHeight: 1
               }}
             >
-              <input
-                type="radio"
-                name="rating"
-                checked={minRating === rating}
-                onChange={() => setMinRating(rating)}
-                style={{ cursor: 'pointer' }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Star size={14} fill="#f59e0b" color="#f59e0b" />
-                <span style={{ fontSize: '14px', color: '#1e293b' }}>
-                  {rating}+ stars
-                </span>
-              </div>
-            </label>
-          ))}
-          <label
-            style={{
+              ×
+            </button>
+          </div>
+
+          {/* Licensed & Insured Only */}
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px'
+          }}>
+            <label style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              cursor: 'pointer',
-              padding: '8px',
-              borderRadius: '6px',
-              backgroundColor: minRating === 0 ? '#ede9fe' : 'transparent'
-            }}
-          >
-            <input
-              type="radio"
-              name="rating"
-              checked={minRating === 0}
-              onChange={() => setMinRating(0)}
-              style={{ cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: '14px', color: '#1e293b' }}>Any rating</span>
-          </label>
+              cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={licensedAndInsuredOnly}
+                onChange={(e) => setLicensedAndInsuredOnly(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <Award size={16} color="#10b981" />
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                Licensed & Insured Only
+              </span>
+            </label>
+          </div>
+
+          {/* After-Hours Available */}
+          <div style={{
+            marginBottom: '24px',
+            padding: '12px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px'
+          }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={afterHoursOnly}
+                onChange={(e) => setAfterHoursOnly(e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <Clock size={16} color="#3b82f6" />
+              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                After-Hours Available
+              </span>
+            </label>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{
+            display: 'flex',
+            gap: '12px'
+          }}>
+            <button
+              onClick={() => {
+                setLicensedAndInsuredOnly(false);
+                setAfterHoursOnly(false);
+              }}
+              style={{
+                flex: 1,
+                padding: '12px',
+                backgroundColor: 'white',
+                color: '#64748b',
+                border: '2px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setShowFiltersModal(false)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                backgroundColor: '#667eea',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Apply
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* Verified Only */}
-      <div style={{
-        marginBottom: '24px',
-        padding: '12px',
-        backgroundColor: '#f8fafc',
-        borderRadius: '8px'
-      }}>
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer'
-        }}>
-          <input
-            type="checkbox"
-            checked={verifiedOnly}
-            onChange={(e) => setVerifiedOnly(e.target.checked)}
-            style={{ cursor: 'pointer' }}
-          />
-          <CheckCircle size={16} color="#3b82f6" />
-          <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
-            Verified Pros Only
-          </span>
-        </label>
-      </div>
-
-      {/* Licensed Only */}
-      <div style={{
-        marginBottom: '24px',
-        padding: '12px',
-        backgroundColor: '#f8fafc',
-        borderRadius: '8px'
-      }}>
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer'
-        }}>
-          <input
-            type="checkbox"
-            checked={licensedOnly}
-            onChange={(e) => setLicensedOnly(e.target.checked)}
-            style={{ cursor: 'pointer' }}
-          />
-          <Award size={16} color="#10b981" />
-          <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
-            Licensed Contractors Only
-          </span>
-        </label>
-      </div>
-
-      {/* Clear Filters */}
-      <button
-        onClick={() => {
-          setSelectedService('');
-          setSelectedCity('');
-          setMinRating(0);
-          setVerifiedOnly(false);
-          setLicensedOnly(false);
-          setSelectedDate('');
-        }}
-        style={{
-          width: '100%',
-          padding: '12px',
-          backgroundColor: 'white',
-          color: '#64748b',
-          border: '2px solid #e2e8f0',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          cursor: 'pointer'
-        }}
-      >
-        Clear All Filters
-      </button>
-    </div>
-  );
+      </>
+    );
+  };
 
   const renderContractorCard = (contractor: Contractor) => (
     <div
@@ -830,9 +826,9 @@ const SearchResults: React.FC = () => {
             </p>
           </div>
 
-          {/* Mobile Filter Button */}
+          {/* Filter Button */}
           <button
-            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            onClick={() => setShowFiltersModal(!showFiltersModal)}
             style={{
               padding: '12px 20px',
               backgroundColor: 'white',
@@ -852,20 +848,11 @@ const SearchResults: React.FC = () => {
           </button>
         </div>
 
-        {/* Layout: Filters + Results */}
-        <div style={{
-          display: 'grid',
-          gap: '32px'
-        }}
-        className="results-layout"
-        >
-          {/* Filters Sidebar */}
-          <div className="filters-sidebar">
-            {renderFilters()}
-          </div>
+        {/* Filters Modal */}
+        {renderFiltersModal()}
 
-          {/* Results Grid */}
-          <div>
+        {/* Results */}
+        <div>
             {loading ? (
               <div style={{
                 textAlign: 'center',
@@ -903,9 +890,8 @@ const SearchResults: React.FC = () => {
                   onClick={() => {
                     setSelectedService('');
                     setSelectedCity('');
-                    setMinRating(0);
-                    setVerifiedOnly(false);
-                    setLicensedOnly(false);
+                    setLicensedAndInsuredOnly(false);
+                    setAfterHoursOnly(false);
                     setSelectedDate('');
                   }}
                   style={{
@@ -930,7 +916,6 @@ const SearchResults: React.FC = () => {
                 {filteredContractors.map(contractor => renderContractorCard(contractor))}
               </div>
             )}
-          </div>
         </div>
       </div>
 
@@ -939,21 +924,6 @@ const SearchResults: React.FC = () => {
         /* Desktop - 4 column search bar */
         .search-grid {
           grid-template-columns: 2fr 1fr 1fr auto;
-        }
-
-        /* Desktop - sidebar + results */
-        .results-layout {
-          grid-template-columns: 280px 1fr;
-        }
-
-        /* Tablet and below - hide sidebar, show mobile filter button */
-        @media (max-width: 1024px) {
-          .filters-sidebar {
-            display: none;
-          }
-          .results-layout {
-            grid-template-columns: 1fr;
-          }
         }
 
         /* Tablet - 2 column search bar */
