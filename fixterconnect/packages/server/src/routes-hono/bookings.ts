@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { BookingStatus } from '@prisma/client';
 import type { Env } from '../worker';
 import type { PrismaClient } from '@prisma/client/edge';
+import { calculateJobSlots } from '../utils/timeSlots.js';
 
 type Variables = {
   prisma: PrismaClient;
@@ -20,7 +21,8 @@ bookings.post('/bookings', async (c) => {
       serviceAddress,
       scheduledDate,
       scheduledTime,
-      price
+      price,
+      estimatedDuration = 90
     } = await c.req.json();
 
     // Validate required fields
@@ -67,49 +69,92 @@ bookings.post('/bookings', async (c) => {
       }, 404);
     }
 
-    // Create booking
-    const booking = await prisma.booking.create({
-      data: {
-        contractorId,
-        clientId,
-        serviceId,
-        serviceAddress,
-        scheduledDate: new Date(scheduledDate),
-        scheduledTime,
-        price: price || null,
-        status: BookingStatus.PENDING
-      },
-      include: {
-        contractor: {
-          select: {
-            id: true,
-            name: true,
-            phone: true
-          }
+    // Parse scheduledTime to get start time (e.g., "09:00 - 11:30" -> "09:00")
+    const startTime = scheduledTime.split(' - ')[0] || scheduledTime;
+
+    // Create booking and time slots in a transaction
+    const booking = await prisma.$transaction(async (tx) => {
+      // Create the booking
+      const newBooking = await tx.booking.create({
+        data: {
+          contractorId,
+          clientId,
+          serviceId,
+          serviceAddress,
+          scheduledDate: new Date(scheduledDate),
+          scheduledTime,
+          estimatedDuration,
+          price: price || null,
+          status: BookingStatus.PENDING
         },
-        client: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            email: true
-          }
-        },
-        service: {
-          select: {
-            id: true,
-            name: true,
-            icon: true
+        include: {
+          contractor: {
+            select: {
+              id: true,
+              name: true,
+              phone: true
+            }
+          },
+          client: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true
+            }
+          },
+          service: {
+            select: {
+              id: true,
+              name: true,
+              icon: true
+            }
           }
         }
-      }
+      });
+
+      // Calculate job and travel slots
+      const { jobSlots, travelSlots } = calculateJobSlots(startTime, estimatedDuration, true);
+
+      const dateObj = new Date(scheduledDate);
+      dateObj.setHours(0, 0, 0, 0);
+
+      // Create job slots
+      const jobSlotRecords = jobSlots.map(slot => ({
+        contractorId,
+        date: dateObj,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        slotType: 'JOB' as const,
+        bookingId: newBooking.id,
+        reason: `Booking #${newBooking.id}`
+      }));
+
+      // Create travel slots
+      const travelSlotRecords = travelSlots.map(slot => ({
+        contractorId,
+        date: dateObj,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        slotType: 'TRAVEL' as const,
+        reason: 'Travel time to next job'
+      }));
+
+      const allSlots = [...jobSlotRecords, ...travelSlotRecords];
+
+      // Create all time slots
+      await Promise.all(
+        allSlots.map(slot => tx.timeSlot.create({ data: slot }))
+      );
+
+      return newBooking;
     });
 
     return c.json({
       success: true,
       booking,
-      message: 'Booking created successfully'
+      message: 'Booking and time slots created successfully'
     }, 201);
   } catch (error) {
     console.error('Create booking error:', error);
@@ -371,6 +416,123 @@ bookings.patch('/bookings/:id/status', async (c) => {
     return c.json({
       success: false,
       error: 'Failed to update booking status'
+    }, 500);
+  }
+});
+
+// PATCH /api/bookings/:id/schedule - Update booking schedule (time/date/duration)
+bookings.patch('/bookings/:id/schedule', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { id } = c.req.param();
+    const { scheduledDate, scheduledTime, estimatedDuration } = await c.req.json();
+
+    // Get existing booking
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingBooking) {
+      return c.json({
+        success: false,
+        error: 'Booking not found'
+      }, 404);
+    }
+
+    // Update booking and time slots in a transaction
+    const booking = await prisma.$transaction(async (tx) => {
+      // Update the booking
+      const updatedBooking = await tx.booking.update({
+        where: { id: parseInt(id) },
+        data: {
+          scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
+          scheduledTime: scheduledTime || undefined,
+          estimatedDuration: estimatedDuration || undefined
+        },
+        include: {
+          contractor: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          client: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          },
+          service: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      // Delete old time slots
+      await tx.timeSlot.deleteMany({
+        where: {
+          OR: [
+            { bookingId: parseInt(id) },
+            { reason: `Booking #${id}` }
+          ]
+        }
+      });
+
+      // Create new time slots if we have the necessary data
+      if (updatedBooking.scheduledTime && updatedBooking.estimatedDuration) {
+        const startTime = updatedBooking.scheduledTime.split(' - ')[0] || updatedBooking.scheduledTime;
+        const { jobSlots, travelSlots } = calculateJobSlots(
+          startTime,
+          updatedBooking.estimatedDuration,
+          true
+        );
+
+        const dateObj = new Date(updatedBooking.scheduledDate);
+        dateObj.setHours(0, 0, 0, 0);
+
+        const jobSlotRecords = jobSlots.map(slot => ({
+          contractorId: updatedBooking.contractorId,
+          date: dateObj,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          slotType: 'JOB' as const,
+          bookingId: updatedBooking.id,
+          reason: `Booking #${updatedBooking.id}`
+        }));
+
+        const travelSlotRecords = travelSlots.map(slot => ({
+          contractorId: updatedBooking.contractorId,
+          date: dateObj,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          slotType: 'TRAVEL' as const,
+          reason: 'Travel time to next job'
+        }));
+
+        const allSlots = [...jobSlotRecords, ...travelSlotRecords];
+
+        await Promise.all(
+          allSlots.map(slot => tx.timeSlot.create({ data: slot }))
+        );
+      }
+
+      return updatedBooking;
+    });
+
+    return c.json({
+      success: true,
+      booking,
+      message: 'Booking schedule and time slots updated successfully'
+    });
+  } catch (error) {
+    console.error('Update booking schedule error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to update booking schedule'
     }, 500);
   }
 });

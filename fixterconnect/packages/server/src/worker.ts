@@ -69,6 +69,7 @@ import adminRoutes from './routes-hono/admin.js';
 import availabilityRoutes from './routes-hono/availability.js';
 import uploadsRoutes from './routes-hono/uploads.js';
 import materialsRoutes from './routes-hono/materials.js';
+import timeSlotsRoutes from './routes-hono/timeSlots.js';
 
 // Register routes
 app.route('/api', authRoutes);
@@ -81,6 +82,7 @@ app.route('/api', invoicesRoutes);
 app.route('/api', adminRoutes);
 app.route('/api', materialsRoutes);
 app.route('/api', availabilityRoutes);
+app.route('/api/time-slots', timeSlotsRoutes);
 app.route('/api', uploadsRoutes);
 
 // Global error handler

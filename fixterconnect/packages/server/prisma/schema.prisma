@@ -104,6 +104,7 @@ model Contractor {
   reviews           Review[]
   messages          Message[]
   availability      Availability[]
+  timeSlots         TimeSlot[]
   serviceAreas      ContractorServiceArea[]
   flaggedMessages   FlaggedMessage[]
   favoritedBy       FavoriteContractor[]
@@ -414,6 +415,34 @@ model Availability {
   @@index([contractorId, dayOfWeek])
   @@index([contractorId, specificDate])
   @@map("availability")
+}
+
+// Time slots for precise scheduling (30-minute blocks)
+model TimeSlot {
+  id           Int          @id @default(autoincrement())
+  contractorId Int          @map("contractor_id")
+  date         DateTime     // Date of the slot
+  startTime    String       @map("start_time") // e.g., "09:00", "09:30", "10:00"
+  endTime      String       @map("end_time")   // e.g., "09:30", "10:00", "10:30"
+  slotType     SlotType     @map("slot_type")  // JOB, TRAVEL, BLOCKED
+  bookingId    Int?         @map("booking_id") // If slotType = JOB, references the booking
+  reason       String?      // Optional description (e.g., "Blocked for lunch", "Travel to next job")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  contractor Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  @@index([contractorId, date])
+  @@index([contractorId, date, startTime])
+  @@index([bookingId])
+  @@map("time_slots")
+}
+
+enum SlotType {
+  JOB      // Slot is occupied by a booking
+  TRAVEL   // 10-minute buffer for travel between jobs
+  BLOCKED  // Manually blocked (lunch, break, etc.)
 }
 
 // ============================================

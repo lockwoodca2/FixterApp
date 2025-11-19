@@ -35,6 +35,9 @@ const ContractorDashboard: React.FC = () => {
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<any>({});
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [timeSlotConflicts, setTimeSlotConflicts] = useState<any[]>([]);
+  const [nextAvailableTime, setNextAvailableTime] = useState<string | null>(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   // Schedule changes modal
   const [showScheduleChanges, setShowScheduleChanges] = useState(false);
@@ -370,27 +373,55 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
-  const handleAcceptScheduleChanges = (notifyCustomers: boolean) => {
+  const handleAcceptScheduleChanges = async (notifyCustomers: boolean) => {
     if (editingJobId) {
-      // Handle single job edit
-      const updatedJobs = todaysJobs.map(job =>
-        job.id === editingJobId
-          ? {
-              ...job,
-              scheduledTime: `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`,
-              duration: `${editFormData.duration} min`
-            }
-          : job
-      );
-      setTodaysJobs(updatedJobs);
+      // Handle single job edit - update via API
+      try {
+        const newScheduledTime = `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`;
 
-      if (notifyCustomers) {
-        // TODO: Send notification to the customer
-        console.log('Sending notification to customer for job edit...');
+        // Find the job to get scheduledDate
+        const job = todaysJobs.find(j => j.id === editingJobId);
+        if (!job) return;
+
+        const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}/schedule`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scheduledDate: job.scheduledDate,
+            scheduledTime: newScheduledTime,
+            estimatedDuration: parseInt(editFormData.duration)
+          })
+        });
+
+        if (!response.ok) {
+          console.error('Failed to update booking schedule');
+          return;
+        }
+
+        // Update local state
+        const updatedJobs = todaysJobs.map(j =>
+          j.id === editingJobId
+            ? {
+                ...j,
+                scheduledTime: newScheduledTime,
+                duration: `${editFormData.duration} min`
+              }
+            : j
+        );
+        setTodaysJobs(updatedJobs);
+
+        if (notifyCustomers) {
+          // TODO: Send notification to the customer
+          console.log('Sending notification to customer for job edit...');
+        }
+
+        setEditingJobId(null);
+        setEditFormData({});
+        setTimeSlotConflicts([]);
+        setNextAvailableTime(null);
+      } catch (error) {
+        console.error('Error updating booking schedule:', error);
       }
-
-      setEditingJobId(null);
-      setEditFormData({});
     } else if (pendingReorder) {
       // Apply the new schedule with calculated times
       const updatedJobs = pendingReorder.map((job, index) => {
@@ -523,9 +554,43 @@ const ContractorDashboard: React.FC = () => {
       startTime: job.scheduledTime?.split(' - ')[0] || '',
       duration: job.duration?.replace(' min', '') || '90'
     });
+    setTimeSlotConflicts([]);
+    setNextAvailableTime(null);
     setShowScheduleChanges(true);
   };
 
+  // Check time slot availability
+  const checkTimeSlotAvailability = async (job: any, startTime: string, durationMinutes: number) => {
+    if (!user?.id || !startTime || !durationMinutes) return;
+
+    setCheckingAvailability(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/time-slots/check-availability`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contractorId: user.id,
+          date: job.scheduledDate,
+          startTime,
+          durationMinutes,
+          excludeBookingId: job.id // Exclude current booking from conflict check
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setTimeSlotConflicts(data.conflicts || []);
+        setNextAvailableTime(data.nextAvailable);
+      }
+    } catch (error) {
+      console.error('Error checking availability:', error);
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
 
   const calculateEndTime = (startTime: string, durationMin: string) => {
     // Simple time calculation helper
@@ -3795,6 +3860,10 @@ const ContractorDashboard: React.FC = () => {
                                 newTime: `${e.target.value} - ${calculateEndTime(e.target.value, editFormData.duration)}`
                               };
                               setAffectedAppointments(updatedAppointments);
+                              // Check availability
+                              if (e.target.value && editFormData.duration) {
+                                checkTimeSlotAvailability(affectedAppointments[0], e.target.value, parseInt(editFormData.duration));
+                              }
                             }}
                             style={{
                               width: '100%',
@@ -3827,6 +3896,10 @@ const ContractorDashboard: React.FC = () => {
                                 newTime: `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, e.target.value)}`
                               };
                               setAffectedAppointments(updatedAppointments);
+                              // Check availability
+                              if (editFormData.startTime && e.target.value) {
+                                checkTimeSlotAvailability(affectedAppointments[0], editFormData.startTime, parseInt(e.target.value));
+                              }
                             }}
                             style={{
                               width: '100%',
@@ -3860,6 +3933,130 @@ const ContractorDashboard: React.FC = () => {
                               : 'Enter time and duration'}
                           </div>
                         </div>
+
+                        {/* Availability Check Results */}
+                        {checkingAvailability && (
+                          <div style={{
+                            backgroundColor: '#f1f5f9',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            marginTop: '12px',
+                            textAlign: 'center',
+                            color: '#64748b',
+                            fontSize: '14px'
+                          }}>
+                            Checking availability...
+                          </div>
+                        )}
+
+                        {!checkingAvailability && timeSlotConflicts.length > 0 && (
+                          <div style={{
+                            backgroundColor: '#fee',
+                            border: '1px solid #fca5a5',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            marginTop: '12px'
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              marginBottom: '8px'
+                            }}>
+                              <AlertTriangle size={18} color="#ef4444" />
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: '#dc2626'
+                              }}>
+                                Time Slot Conflicts Detected
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '13px', color: '#7f1d1d' }}>
+                              This time overlaps with {timeSlotConflicts.length} existing {timeSlotConflicts.length === 1 ? 'booking' : 'bookings'}:
+                            </div>
+                            <ul style={{
+                              margin: '8px 0 0 0',
+                              paddingLeft: '20px',
+                              fontSize: '12px',
+                              color: '#991b1b'
+                            }}>
+                              {timeSlotConflicts.map((conflict, idx) => (
+                                <li key={idx}>
+                                  {conflict.startTime} - {conflict.endTime} ({conflict.slotType})
+                                  {conflict.bookingId && ` - Booking #${conflict.bookingId}`}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {!checkingAvailability && timeSlotConflicts.length === 0 && editFormData.startTime && editFormData.duration && (
+                          <div style={{
+                            backgroundColor: '#dcfce7',
+                            border: '1px solid #86efac',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            marginTop: '12px'
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}>
+                              <CheckCircle size={18} color="#16a34a" />
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: '#15803d'
+                              }}>
+                                Time slot is available
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {!checkingAvailability && nextAvailableTime && timeSlotConflicts.length > 0 && (
+                          <div style={{
+                            backgroundColor: '#dbeafe',
+                            border: '1px solid #93c5fd',
+                            padding: '12px',
+                            borderRadius: '6px',
+                            marginTop: '8px'
+                          }}>
+                            <div style={{
+                              fontSize: '13px',
+                              color: '#1e40af',
+                              marginBottom: '6px'
+                            }}>
+                              Next available time:
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditFormData({ ...editFormData, startTime: nextAvailableTime });
+                                const updatedAppointments = [...affectedAppointments];
+                                updatedAppointments[0] = {
+                                  ...updatedAppointments[0],
+                                  newTime: `${nextAvailableTime} - ${calculateEndTime(nextAvailableTime, editFormData.duration)}`
+                                };
+                                setAffectedAppointments(updatedAppointments);
+                                checkTimeSlotAvailability(affectedAppointments[0], nextAvailableTime, parseInt(editFormData.duration));
+                              }}
+                              style={{
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                padding: '8px 16px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Use {nextAvailableTime}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       // View Mode - Show time comparison
