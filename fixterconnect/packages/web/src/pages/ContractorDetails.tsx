@@ -99,7 +99,7 @@ const ContractorDetails: React.FC = () => {
     }
   }, [selectedDate, availabilityData]);
 
-  const loadAvailableTimeSlots = (date: string) => {
+  const loadAvailableTimeSlots = async (date: string) => {
     // Find availability entry for selected date
     // The API returns dates as ISO strings, so we need to normalize for comparison
     const availEntry = availabilityData.find(
@@ -109,22 +109,48 @@ const ContractorDetails: React.FC = () => {
       }
     );
 
-    if (!availEntry) {
+    if (!availEntry || !contractor) {
       setAvailableTimeSlots([]);
       return;
     }
 
-    // Generate time slots based on start and end time
+    // Generate hourly time slots based on start and end time
     const startHour = parseInt(availEntry.startTime?.split(':')[0] || '8');
     const endHour = parseInt(availEntry.endTime?.split(':')[0] || '17');
-    const slots = [];
+    const potentialSlots = [];
 
     for (let hour = startHour; hour < endHour && hour < 17; hour++) {
-      const time12hr = hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`;
-      slots.push(time12hr);
+      potentialSlots.push({
+        time24: `${hour.toString().padStart(2, '0')}:00`,
+        time12: hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`
+      });
     }
 
-    setAvailableTimeSlots(slots);
+    // Check each time slot for availability using the time slots API
+    const availableSlots = [];
+    for (const slot of potentialSlots) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/time-slots/check-availability`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contractorId: contractor.id,
+            date: date,
+            startTime: slot.time24,
+            durationMinutes: 90 // Default duration for checking availability
+          })
+        });
+
+        const data = await response.json();
+        if (data.success && data.isAvailable) {
+          availableSlots.push(slot.time12);
+        }
+      } catch (error) {
+        console.error('Error checking time slot availability:', error);
+      }
+    }
+
+    setAvailableTimeSlots(availableSlots);
   };
 
   const handleBooking = async () => {
