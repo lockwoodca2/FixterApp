@@ -65,6 +65,7 @@ const ContractorDetails: React.FC = () => {
         if (availResponse.ok) {
           const availData = await availResponse.json();
           if (availData.success) {
+            console.log('Availability data received:', availData.availabilities);
             setAvailabilityData(availData.availabilities || []);
           }
         }
@@ -227,7 +228,11 @@ const ContractorDetails: React.FC = () => {
     const availEntry = availabilityData.find(
       (a: any) => {
         const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : new Date(a.date).toISOString().split('T')[0];
-        return apiDate === dateString && a.isAvailable && a.availableSlots > 0;
+        const matches = apiDate === dateString && a.isAvailable && a.availableSlots > 0;
+        if (matches) {
+          console.log(`Date ${dateString} is available:`, a);
+        }
+        return matches;
       }
     );
     return !!availEntry;
