@@ -155,8 +155,28 @@ const ServicesList: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [services, setServices] = useState<any>(MOCK_SERVICES_BY_CATEGORY);
+  const [cities, setCities] = useState<string[]>(['Nampa', 'Boise', 'Caldwell', 'Meridian', 'Eagle']);
 
-  const cities = ['All Cities', 'Nampa', 'Boise', 'Caldwell', 'Meridian', 'Eagle'];
+  // Fetch cities from database
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/service-areas`);
+        if (response.ok) {
+          const serviceAreas = await response.json();
+          const cityNames = serviceAreas.map((area: any) => area.name);
+          if (cityNames.length > 0) {
+            setCities(cityNames);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch cities:', error);
+        // Keep using default cities on error
+      }
+    };
+
+    fetchCities();
+  }, []);
 
   const handleServiceClick = (serviceName: string) => {
     const params = new URLSearchParams();

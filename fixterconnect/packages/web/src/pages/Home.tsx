@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -14,11 +14,13 @@ import {
   DollarSign,
   ArrowRight
 } from 'react-feather';
+import { API_BASE_URL } from '../config/api';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [selectedService, setSelectedService] = useState('Gutter Cleaning');
   const [selectedCity, setSelectedCity] = useState('Nampa');
+  const [cities, setCities] = useState<string[]>(['Nampa', 'Caldwell', 'Boise', 'Meridian', 'Eagle']);
 
   // Mock data - TODO: Replace with API calls
   const services = [
@@ -32,7 +34,30 @@ const Home: React.FC = () => {
     'Tree Trimming'
   ];
 
-  const cities = ['Nampa', 'Caldwell', 'Boise', 'Meridian', 'Eagle'];
+  // Fetch cities from database
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/service-areas`);
+        if (response.ok) {
+          const serviceAreas = await response.json();
+          const cityNames = serviceAreas.map((area: any) => area.name);
+          if (cityNames.length > 0) {
+            setCities(cityNames);
+            // Set first city as default if current selection isn't in the list
+            if (!cityNames.includes(selectedCity)) {
+              setSelectedCity(cityNames[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch cities:', error);
+        // Keep using default cities on error
+      }
+    };
+
+    fetchCities();
+  }, []);
 
   const popularServices = [
     {
