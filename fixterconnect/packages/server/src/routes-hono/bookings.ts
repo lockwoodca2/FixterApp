@@ -243,6 +243,13 @@ bookings.get('/bookings/contractor/:contractorId', async (c) => {
         gte: targetDate,
         lt: nextDay
       };
+
+      // Exclude cancelled bookings when filtering by date (for today's jobs view)
+      if (!status) {
+        where.status = {
+          not: BookingStatus.CANCELLED
+        };
+      }
     }
 
     const bookingsList = await prisma.booking.findMany({
