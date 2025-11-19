@@ -438,7 +438,7 @@ const ServicesList: React.FC = () => {
                 }}
               >
                 <option value="">All Cities</option>
-                {cities.slice(1).map(city => (
+                {cities.map(city => (
                   <option key={city} value={city}>{city}</option>
                 ))}
               </select>
