@@ -848,6 +848,51 @@ const ContractorDetails: React.FC = () => {
               </p>
             </div>
 
+            {/* Services Offered */}
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '32px',
+              marginBottom: '24px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Briefcase size={24} color="#667eea" />
+                Services Offered
+              </h2>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '12px'
+              }}>
+                {contractor.services?.map((cs: any) => (
+                  <div
+                    key={cs.service.id}
+                    style={{
+                      padding: '16px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '8px',
+                      fontSize: '15px',
+                      fontWeight: '600',
+                      color: '#1e293b',
+                      textAlign: 'center',
+                      border: '1px solid #e2e8f0'
+                    }}
+                  >
+                    {cs.service.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Job Photos Section */}
             <div style={{
               backgroundColor: 'white',
