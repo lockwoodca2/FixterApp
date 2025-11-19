@@ -98,8 +98,12 @@ const ContractorDetails: React.FC = () => {
 
   const loadAvailableTimeSlots = (date: string) => {
     // Find availability entry for selected date
+    // The API returns dates as ISO strings, so we need to normalize for comparison
     const availEntry = availabilityData.find(
-      (a: any) => a.date === date && a.available && a.availableSlots > 0
+      (a: any) => {
+        const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : new Date(a.date).toISOString().split('T')[0];
+        return apiDate === date && a.isAvailable && a.availableSlots > 0;
+      }
     );
 
     if (!availEntry) {
@@ -221,7 +225,10 @@ const ContractorDetails: React.FC = () => {
   // Check if a specific date has availability
   const isDateAvailable = (dateString: string) => {
     const availEntry = availabilityData.find(
-      (a: any) => a.date === dateString && a.available && a.availableSlots > 0
+      (a: any) => {
+        const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : new Date(a.date).toISOString().split('T')[0];
+        return apiDate === dateString && a.isAvailable && a.availableSlots > 0;
+      }
     );
     return !!availEntry;
   };
