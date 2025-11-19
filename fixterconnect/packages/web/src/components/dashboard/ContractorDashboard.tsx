@@ -12,7 +12,8 @@ import {
   MapPin,
   X,
   Flag,
-  AlertTriangle
+  AlertTriangle,
+  Edit2
 } from 'react-feather';
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
@@ -486,11 +487,18 @@ const ContractorDashboard: React.FC = () => {
 
   // Edit handlers
   const handleEditJob = (job: any) => {
-    setEditingJobId(job.id);
-    setEditFormData({
-      startTime: job.scheduledTime?.split(' - ')[0] || '',
-      duration: job.duration || '90'
-    });
+    // Show warning about customer notification
+    const confirmed = window.confirm(
+      `Editing this appointment's time or duration will affect the schedule.\n\nThe customer will be notified of any changes.\n\nDo you want to proceed?`
+    );
+
+    if (confirmed) {
+      setEditingJobId(job.id);
+      setEditFormData({
+        startTime: job.scheduledTime?.split(' - ')[0] || '',
+        duration: job.duration || '90'
+      });
+    }
   };
 
   const handleSaveEdit = async (jobId: number) => {
@@ -748,6 +756,15 @@ const ContractorDashboard: React.FC = () => {
                       <span>•</span>
                       <span>{job.scheduledTime}</span>
                       <span style={{ marginLeft: '4px' }}>({job.duration || '90 min'})</span>
+                      <Edit2
+                        size={16}
+                        onClick={() => handleEditJob(job)}
+                        style={{
+                          cursor: 'pointer',
+                          color: '#4f46e5',
+                          marginLeft: '4px'
+                        }}
+                      />
                     </div>
                   )}
 
