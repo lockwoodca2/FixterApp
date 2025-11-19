@@ -122,6 +122,7 @@ export async function getContractorAvailability(
 
 /**
  * Get availability for a contractor across a date range
+ * Optimized to batch database queries instead of making one per day
  */
 export async function getContractorAvailabilityRange(
   prisma: PrismaClient,
@@ -129,16 +130,144 @@ export async function getContractorAvailabilityRange(
   startDate: Date,
   endDate: Date
 ) {
-  const availabilities = [];
-  const currentDate = new Date(startDate);
-  currentDate.setHours(0, 0, 0, 0);
-
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
   const end = new Date(endDate);
   end.setHours(0, 0, 0, 0);
 
+  // Batch fetch all data we need upfront
+  const [recurringSchedule, specificOverrides, bookings] = await Promise.all([
+    // Get contractor's recurring schedule (for each day of week)
+    prisma.availability.findMany({
+      where: {
+        contractorId,
+        isRecurring: true
+      }
+    }),
+    // Get any specific date overrides in this range
+    prisma.availability.findMany({
+      where: {
+        contractorId,
+        isRecurring: false,
+        specificDate: {
+          gte: start,
+          lte: end
+        }
+      }
+    }),
+    // Get all bookings in this range
+    prisma.booking.findMany({
+      where: {
+        contractorId,
+        scheduledDate: {
+          gte: start,
+          lte: end
+        },
+        status: {
+          in: [BookingStatus.CONFIRMED, BookingStatus.IN_PROGRESS]
+        }
+      },
+      select: {
+        scheduledDate: true
+      }
+    })
+  ]);
+
+  // Count bookings by date
+  const bookingsByDate: { [key: string]: number } = {};
+  bookings.forEach(booking => {
+    const dateKey = booking.scheduledDate.toISOString().split('T')[0];
+    bookingsByDate[dateKey] = (bookingsByDate[dateKey] || 0) + 1;
+  });
+
+  // Build a map of specific overrides by date
+  const overridesByDate: { [key: string]: any } = {};
+  specificOverrides.forEach(override => {
+    if (override.specificDate) {
+      const dateKey = override.specificDate.toISOString().split('T')[0];
+      overridesByDate[dateKey] = override;
+    }
+  });
+
+  // Build a map of recurring schedule by day of week
+  const scheduleByDayOfWeek: { [key: number]: any } = {};
+  recurringSchedule.forEach(schedule => {
+    if (schedule.dayOfWeek !== null) {
+      scheduleByDayOfWeek[schedule.dayOfWeek] = schedule;
+    }
+  });
+
+  // Now generate availability for each day in range
+  const availabilities = [];
+  const currentDate = new Date(start);
+
   while (currentDate <= end) {
-    const availability = await getContractorAvailability(prisma, contractorId, new Date(currentDate));
-    availabilities.push(availability);
+    const dateOnly = new Date(currentDate);
+    dateOnly.setHours(0, 0, 0, 0);
+    const dateKey = dateOnly.toISOString().split('T')[0];
+    const dayOfWeek = dateOnly.getDay();
+    const confirmedBookings = bookingsByDate[dateKey] || 0;
+
+    // Check for specific override first
+    const override = overridesByDate[dateKey];
+    if (override) {
+      if (!override.isAvailable) {
+        availabilities.push({
+          date: dateOnly,
+          dayOfWeek,
+          isAvailable: false,
+          reason: 'Contractor unavailable on this date',
+          availableSlots: 0,
+          maxBookings: 0,
+          confirmedBookings: 0,
+          startTime: null,
+          endTime: null
+        });
+      } else {
+        const availableSlots = override.maxBookings - confirmedBookings;
+        availabilities.push({
+          date: dateOnly,
+          dayOfWeek,
+          isAvailable: availableSlots > 0,
+          reason: availableSlots > 0 ? 'Available' : 'Fully booked',
+          availableSlots,
+          maxBookings: override.maxBookings,
+          confirmedBookings,
+          startTime: override.startTime,
+          endTime: override.endTime
+        });
+      }
+    } else {
+      // Use recurring schedule
+      const schedule = scheduleByDayOfWeek[dayOfWeek];
+      if (!schedule || !schedule.isAvailable) {
+        availabilities.push({
+          date: dateOnly,
+          dayOfWeek,
+          isAvailable: false,
+          reason: 'Contractor does not work on this day',
+          availableSlots: 0,
+          maxBookings: 0,
+          confirmedBookings: 0,
+          startTime: null,
+          endTime: null
+        });
+      } else {
+        const availableSlots = schedule.maxBookings - confirmedBookings;
+        availabilities.push({
+          date: dateOnly,
+          dayOfWeek,
+          isAvailable: availableSlots > 0,
+          reason: availableSlots > 0 ? 'Available' : 'Fully booked',
+          availableSlots,
+          maxBookings: schedule.maxBookings,
+          confirmedBookings,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime
+        });
+      }
+    }
+
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
