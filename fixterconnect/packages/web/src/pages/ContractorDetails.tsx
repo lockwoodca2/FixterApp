@@ -1085,49 +1085,6 @@ const ContractorDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Services Offered */}
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '24px',
-              marginBottom: '24px',
-              border: '1px solid #e2e8f0'
-            }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#1e293b',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <Briefcase size={20} color="#667eea" />
-                Services Offered
-              </h3>
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                {contractor.services?.map((cs: any) => (
-                  <div
-                    key={cs.service.id}
-                    style={{
-                      padding: '12px',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#1e293b'
-                    }}
-                  >
-                    {cs.service.name}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Quick Stats */}
             <div style={{
               backgroundColor: 'white',
