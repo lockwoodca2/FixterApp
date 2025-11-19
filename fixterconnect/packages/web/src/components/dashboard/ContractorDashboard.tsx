@@ -593,6 +593,14 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
+  const formatTo12Hour = (time24: string) => {
+    // Convert 24-hour time (HH:MM) to 12-hour format (H:MM AM/PM)
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
   const calculateEndTime = (startTime: string, durationMin: string) => {
     // Simple time calculation helper
     const [hours, minutes] = startTime.split(':').map(Number);
@@ -3932,7 +3940,7 @@ const ContractorDashboard: React.FC = () => {
                             color: '#10b981'
                           }}>
                             {editFormData.startTime && editFormData.duration
-                              ? `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)} (${editFormData.duration} min)`
+                              ? `${formatTo12Hour(editFormData.startTime)} - ${calculateEndTime(editFormData.startTime, editFormData.duration)} (${editFormData.duration} min)`
                               : 'Enter time and duration'}
                           </div>
                         </div>
@@ -4056,7 +4064,7 @@ const ContractorDashboard: React.FC = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              Use {nextAvailableTime}
+                              Use {formatTo12Hour(nextAvailableTime)}
                             </button>
                           </div>
                         )}
