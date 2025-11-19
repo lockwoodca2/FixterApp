@@ -68,6 +68,8 @@ const ContractorDetails: React.FC = () => {
             console.log('Availability data received:', availData.availabilities);
             setAvailabilityData(availData.availabilities || []);
           }
+        } else {
+          console.error('Availability API error:', availResponse.status, await availResponse.text());
         }
 
         // Load job photos
