@@ -7,168 +7,23 @@ import {
   CheckCircle,
   Award,
   Clock,
-  DollarSign,
+  Image as ImageIcon,
   Users,
-  Phone,
-  Mail,
   Briefcase,
   Shield,
   ExternalLink,
   ChevronLeft,
-  ChevronRight,
   X
 } from 'react-feather';
-import { ApiClient } from '@fixterconnect/core';
-import type { Contractor } from '@fixterconnect/core';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
-
-const apiClient = new ApiClient(API_BASE_URL);
-
-// Mock contractor data (matching SearchResults mock data)
-const MOCK_CONTRACTORS: Contractor[] = [
-  {
-    id: 1,
-    username: 'contractor1',
-    name: 'Mike Johnson',
-    rating: 4.9,
-    review_count: 156,
-    description: 'Expert in gutter cleaning and exterior maintenance with over 10 years of experience. I take pride in providing high-quality service and ensuring customer satisfaction on every job. My team and I are fully insured and committed to delivering exceptional results.',
-    years_in_business: 10,
-    location: 'Nampa, ID',
-    verified: true,
-    licensed: true,
-    services: [
-      { id: 1, name: 'Gutter Cleaning', description: 'Professional gutter cleaning services' },
-      { id: 3, name: 'Pressure Washing', description: 'Exterior cleaning services' }
-    ],
-    google_business_url: 'https://maps.google.com'
-  },
-  {
-    id: 2,
-    username: 'contractor2',
-    name: 'Sarah Williams',
-    rating: 4.8,
-    review_count: 203,
-    description: 'Professional lawn care and landscaping services for residential and commercial properties.',
-    years_in_business: 8,
-    location: 'Boise, ID',
-    verified: true,
-    licensed: false,
-    services: [
-      { id: 2, name: 'Lawn Care', description: 'Lawn mowing and maintenance' },
-      { id: 3, name: 'Pressure Washing', description: 'Exterior cleaning services' }
-    ],
-    google_business_url: 'https://maps.google.com'
-  },
-  {
-    id: 3,
-    username: 'contractor3',
-    name: 'David Brown',
-    rating: 4.7,
-    review_count: 89,
-    description: 'Specialized in window cleaning and pressure washing for homes and businesses.',
-    years_in_business: 5,
-    location: 'Nampa, ID',
-    verified: false,
-    licensed: false,
-    services: [
-      { id: 4, name: 'Window Cleaning', description: 'Residential and commercial window cleaning' },
-      { id: 3, name: 'Pressure Washing', description: 'Exterior cleaning services' }
-    ],
-    google_business_url: 'https://maps.google.com'
-  },
-  {
-    id: 4,
-    username: 'contractor4',
-    name: 'Jennifer Martinez',
-    rating: 5.0,
-    review_count: 74,
-    description: 'Quality painting services with attention to detail. Interior and exterior projects welcome.',
-    years_in_business: 12,
-    location: 'Meridian, ID',
-    verified: true,
-    licensed: true,
-    services: [
-      { id: 5, name: 'Painting', description: 'Interior and exterior painting' }
-    ],
-    google_business_url: 'https://maps.google.com'
-  },
-  {
-    id: 5,
-    username: 'contractor5',
-    name: 'Tom Anderson',
-    rating: 4.6,
-    review_count: 112,
-    description: 'Licensed plumber serving the Treasure Valley. Quick response times and fair pricing.',
-    years_in_business: 15,
-    location: 'Boise, ID',
-    verified: true,
-    licensed: true,
-    services: [
-      { id: 6, name: 'Plumbing', description: 'Basic plumbing repairs' }
-    ]
-  },
-  {
-    id: 6,
-    username: 'contractor6',
-    name: 'Lisa Garcia',
-    rating: 4.9,
-    review_count: 187,
-    description: 'Full-service gutter specialist. Cleaning, repairs, and installation available.',
-    years_in_business: 7,
-    location: 'Nampa, ID',
-    verified: false,
-    licensed: true,
-    services: [
-      { id: 1, name: 'Gutter Cleaning', description: 'Professional gutter cleaning services' }
-    ],
-    google_business_url: 'https://maps.google.com'
-  }
-];
-
-// Mock reviews
-const MOCK_REVIEWS = [
-  {
-    id: 1,
-    clientName: 'John Smith',
-    rating: 5,
-    date: '2024-10-15',
-    comment: 'Excellent work! Very professional and thorough. The gutters look great and the cleanup was impeccable.',
-    service: 'Gutter Cleaning'
-  },
-  {
-    id: 2,
-    clientName: 'Emily Davis',
-    rating: 5,
-    date: '2024-10-10',
-    comment: 'Highly recommend! Arrived on time, fair pricing, and quality work. Will definitely use again.',
-    service: 'Gutter Cleaning'
-  },
-  {
-    id: 3,
-    clientName: 'Michael Brown',
-    rating: 4,
-    date: '2024-10-05',
-    comment: 'Great service overall. Very responsive to messages and completed the job as scheduled.',
-    service: 'Pressure Washing'
-  },
-  {
-    id: 4,
-    clientName: 'Sarah Johnson',
-    rating: 5,
-    date: '2024-09-28',
-    comment: 'Best contractor I\'ve worked with! Professional, friendly, and the results exceeded my expectations.',
-    service: 'Gutter Cleaning'
-  }
-];
 
 const ContractorDetails: React.FC = () => {
   const { contractorId } = useParams<{ contractorId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [contractor, setContractor] = useState<Contractor | null>(null);
+  const [contractor, setContractor] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedService, setSelectedService] = useState<string>('');
@@ -176,10 +31,10 @@ const ContractorDetails: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [serviceAddress, setServiceAddress] = useState<string>('');
   const [bookingNotes, setBookingNotes] = useState<string>('');
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [contractorSchedule, setContractorSchedule] = useState<any[]>([]);
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [jobPhotos, setJobPhotos] = useState<any[]>([]);
 
   useEffect(() => {
     loadContractor();
@@ -189,27 +44,41 @@ const ContractorDetails: React.FC = () => {
     try {
       setLoading(true);
 
-      // Try API first
-      try {
-        const contractorData = await apiClient.getContractor(Number(contractorId));
-        setContractor(contractorData);
+      // Fetch contractor profile
+      const response = await fetch(`${API_BASE_URL}/contractor/${contractorId}`);
+      if (!response.ok) {
+        throw new Error('Contractor not found');
+      }
 
-        // Load contractor schedule for next 30 days
+      const data = await response.json();
+      if (data.success) {
+        setContractor(data.contractor);
+
+        // Load availability for next 30 days
         const startDate = new Date().toISOString().split('T')[0];
         const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const schedule = await apiClient.getContractorSchedule(Number(contractorId), startDate, endDate);
-        setContractorSchedule(schedule);
-      } catch (apiError) {
-        // Fall back to mock data
-        console.log('Using mock contractor data');
-        const mockContractor = MOCK_CONTRACTORS.find(c => c.id === Number(contractorId));
-        if (mockContractor) {
-          setContractor(mockContractor);
+
+        const availResponse = await fetch(
+          `${API_BASE_URL}/availability/contractor/${contractorId}/range?startDate=${startDate}&endDate=${endDate}`
+        );
+
+        if (availResponse.ok) {
+          const availData = await availResponse.json();
+          if (availData.success) {
+            setAvailabilityData(availData.availabilities || []);
+          }
         }
 
-        // Mock schedule data - generate availability for next 2 weeks
-        const mockSchedule = generateMockSchedule();
-        setContractorSchedule(mockSchedule);
+        // Load job photos
+        const photosResponse = await fetch(`${API_BASE_URL}/bookings/contractor/${contractorId}/photos`);
+        if (photosResponse.ok) {
+          const photosData = await photosResponse.json();
+          if (photosData.success) {
+            setJobPhotos(photosData.photos || []);
+          }
+        }
+      } else {
+        throw new Error(data.error || 'Failed to load contractor');
       }
     } catch (error) {
       console.error('Error loading contractor:', error);
@@ -218,63 +87,32 @@ const ContractorDetails: React.FC = () => {
     }
   };
 
-  // Generate mock schedule for development
-  const generateMockSchedule = () => {
-    const schedule = [];
-    const today = new Date();
-
-    // Generate 14 days of availability
-    for (let i = 0; i < 14; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const dayOfWeek = date.getDay();
-
-      // Skip Sundays (0)
-      if (dayOfWeek === 0) continue;
-
-      // Add availability for weekdays with different time slots
-      schedule.push({
-        date: date.toISOString().split('T')[0],
-        day_of_week: dayOfWeek,
-        available: true,
-        start_time: '08:00',
-        end_time: '17:00',
-        max_slots: 4,
-        booked_slots: Math.floor(Math.random() * 2), // Random bookings (0-1)
-        available_slots: 4 - Math.floor(Math.random() * 2)
-      });
-    }
-
-    return schedule;
-  };
-
   // Load available time slots when date is selected
   useEffect(() => {
-    if (selectedDate && contractorSchedule.length > 0) {
+    if (selectedDate && availabilityData.length > 0) {
       loadAvailableTimeSlots(selectedDate);
     } else {
       setAvailableTimeSlots([]);
     }
-  }, [selectedDate, contractorSchedule]);
+  }, [selectedDate, availabilityData]);
 
   const loadAvailableTimeSlots = (date: string) => {
-    // Find schedule entry for selected date
-    const scheduleEntry = contractorSchedule.find(
-      s => s.date === date && s.available && s.available_slots > 0
+    // Find availability entry for selected date
+    const availEntry = availabilityData.find(
+      (a: any) => a.date === date && a.available && a.availableSlots > 0
     );
 
-    if (!scheduleEntry) {
+    if (!availEntry) {
       setAvailableTimeSlots([]);
       return;
     }
 
     // Generate time slots based on start and end time
-    const startHour = parseInt(scheduleEntry.start_time.split(':')[0]);
-    const endHour = parseInt(scheduleEntry.end_time.split(':')[0]);
+    const startHour = parseInt(availEntry.startTime?.split(':')[0] || '8');
+    const endHour = parseInt(availEntry.endTime?.split(':')[0] || '17');
     const slots = [];
 
     for (let hour = startHour; hour < endHour && hour < 17; hour++) {
-      // Generate slots every hour
       const time12hr = hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`;
       slots.push(time12hr);
     }
@@ -302,7 +140,7 @@ const ContractorDetails: React.FC = () => {
       setIsSubmitting(true);
 
       // Find the selected service details
-      const service = contractor.services?.find(s => s.name === selectedService);
+      const service = contractor.services?.find((s: any) => s.service.name === selectedService);
       if (!service) {
         throw new Error('Service not found');
       }
@@ -316,11 +154,11 @@ const ContractorDetails: React.FC = () => {
         body: JSON.stringify({
           contractorId: contractor.id,
           clientId: user.id,
-          serviceId: service.id,
+          serviceId: service.service.id,
           serviceAddress: serviceAddress,
           scheduledDate: selectedDate,
           scheduledTime: selectedTime,
-          price: null // Price can be determined later
+          price: null
         })
       });
 
@@ -336,9 +174,6 @@ const ContractorDetails: React.FC = () => {
         setSelectedTime('');
         setServiceAddress('');
         setBookingNotes('');
-
-        // Optionally navigate to dashboard
-        // navigate('/client-dashboard');
       } else {
         throw new Error(data.error || 'Failed to create booking');
       }
@@ -366,7 +201,6 @@ const ContractorDetails: React.FC = () => {
   };
 
   const getAvailableTimes = () => {
-    // If a date is selected, return the available slots for that date
     if (selectedDate && availableTimeSlots.length > 0) {
       return availableTimeSlots;
     }
@@ -386,10 +220,10 @@ const ContractorDetails: React.FC = () => {
 
   // Check if a specific date has availability
   const isDateAvailable = (dateString: string) => {
-    const scheduleEntry = contractorSchedule.find(
-      s => s.date === dateString && s.available && s.available_slots > 0
+    const availEntry = availabilityData.find(
+      (a: any) => a.date === dateString && a.available && a.availableSlots > 0
     );
-    return !!scheduleEntry;
+    return !!availEntry;
   };
 
   // Get next 30 days for calendar display
@@ -490,9 +324,9 @@ const ContractorDetails: React.FC = () => {
               }}
             >
               <option value="">Choose a service...</option>
-              {contractor.services?.map((service) => (
-                <option key={service.id} value={service.name}>
-                  {service.name}
+              {contractor.services?.map((cs: any) => (
+                <option key={cs.service.id} value={cs.service.name}>
+                  {cs.service.name}
                 </option>
               ))}
             </select>
@@ -888,11 +722,11 @@ const ContractorDetails: React.FC = () => {
                     fontSize: '16px',
                     color: '#64748b'
                   }}>
-                    ({contractor.reviewCount || contractor.review_count || 0} reviews)
+                    ({contractor.reviewCount || 0} reviews)
                   </span>
                 </div>
 
-                {(contractor.yearsInBusiness || contractor.years_in_business) && (
+                {contractor.yearsInBusiness && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -901,7 +735,7 @@ const ContractorDetails: React.FC = () => {
                   }}>
                     <Shield size={18} />
                     <span style={{ fontSize: '16px' }}>
-                      {contractor.yearsInBusiness || contractor.years_in_business} years in business
+                      {contractor.yearsInBusiness} years in business
                     </span>
                   </div>
                 )}
@@ -948,9 +782,9 @@ const ContractorDetails: React.FC = () => {
                   Book Now
                 </button>
 
-                {contractor.google_business_url && (
+                {contractor.googleBusinessUrl && (
                   <button
-                    onClick={() => window.open(contractor.google_business_url, '_blank')}
+                    onClick={() => window.open(contractor.googleBusinessUrl, '_blank')}
                     style={{
                       padding: '14px 28px',
                       backgroundColor: 'white',
@@ -1010,11 +844,11 @@ const ContractorDetails: React.FC = () => {
                 lineHeight: '1.8',
                 margin: 0
               }}>
-                {contractor.description}
+                {contractor.description || 'No description provided.'}
               </p>
             </div>
 
-            {/* Reviews Section */}
+            {/* Job Photos Section */}
             <div style={{
               backgroundColor: 'white',
               borderRadius: '12px',
@@ -1023,87 +857,62 @@ const ContractorDetails: React.FC = () => {
             }}>
               <div style={{
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
+                gap: '12px',
                 marginBottom: '24px'
               }}>
+                <ImageIcon size={24} color="#667eea" />
                 <h2 style={{
                   fontSize: '24px',
                   fontWeight: 'bold',
                   color: '#1e293b',
                   margin: 0
                 }}>
-                  Reviews
+                  Previous Work
                 </h2>
-                <span style={{
-                  fontSize: '16px',
-                  color: '#64748b'
-                }}>
-                  {contractor.reviewCount || contractor.review_count || 0} total reviews
-                </span>
               </div>
 
-              {/* Review List */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '24px'
-              }}>
-                {MOCK_REVIEWS.map((review) => (
-                  <div
-                    key={review.id}
-                    style={{
-                      paddingBottom: '24px',
-                      borderBottom: '1px solid #e2e8f0'
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '12px'
-                    }}>
-                      <div>
-                        <div style={{
-                          fontWeight: 'bold',
-                          fontSize: '16px',
-                          color: '#1e293b',
-                          marginBottom: '4px'
-                        }}>
-                          {review.clientName}
-                        </div>
-                        <div style={{
-                          fontSize: '13px',
-                          color: '#64748b'
-                        }}>
-                          {new Date(review.date).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </div>
-                      </div>
-                      {renderStars(review.rating)}
+              {jobPhotos.length > 0 ? (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: '16px'
+                }}>
+                  {jobPhotos.map((photo: any) => (
+                    <div
+                      key={photo.id}
+                      style={{
+                        aspectRatio: '1',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        backgroundColor: '#f1f5f9',
+                        border: '1px solid #e2e8f0'
+                      }}
+                    >
+                      <img
+                        src={photo.url}
+                        alt={photo.originalName || 'Job photo'}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
                     </div>
-                    <div style={{
-                      fontSize: '13px',
-                      color: '#667eea',
-                      fontWeight: '600',
-                      marginBottom: '8px'
-                    }}>
-                      {review.service}
-                    </div>
-                    <p style={{
-                      fontSize: '15px',
-                      color: '#475569',
-                      lineHeight: '1.6',
-                      margin: 0
-                    }}>
-                      {review.comment}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  padding: '48px',
+                  textAlign: 'center',
+                  color: '#94a3b8'
+                }}>
+                  <ImageIcon size={48} style={{ marginBottom: '12px' }} />
+                  <p style={{ margin: 0, fontSize: '14px' }}>
+                    No photos available yet
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1256,9 +1065,9 @@ const ContractorDetails: React.FC = () => {
                 flexDirection: 'column',
                 gap: '8px'
               }}>
-                {contractor.services?.map((service) => (
+                {contractor.services?.map((cs: any) => (
                   <div
-                    key={service.id}
+                    key={cs.service.id}
                     style={{
                       padding: '12px',
                       backgroundColor: '#f8fafc',
@@ -1268,7 +1077,7 @@ const ContractorDetails: React.FC = () => {
                       color: '#1e293b'
                     }}
                   >
-                    {service.name}
+                    {cs.service.name}
                   </div>
                 ))}
               </div>
@@ -1349,7 +1158,7 @@ const ContractorDetails: React.FC = () => {
                       fontWeight: 'bold',
                       color: '#1e293b'
                     }}>
-                      {contractor.reviewCount || contractor.review_count || 0}
+                      {contractor.reviewCount || 0}
                     </div>
                     <div style={{
                       fontSize: '13px',
@@ -1360,7 +1169,7 @@ const ContractorDetails: React.FC = () => {
                   </div>
                 </div>
 
-                {(contractor.yearsInBusiness || contractor.years_in_business) && (
+                {contractor.yearsInBusiness && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1383,7 +1192,7 @@ const ContractorDetails: React.FC = () => {
                         fontWeight: 'bold',
                         color: '#1e293b'
                       }}>
-                        {contractor.yearsInBusiness || contractor.years_in_business}
+                        {contractor.yearsInBusiness}
                       </div>
                       <div style={{
                         fontSize: '13px',
