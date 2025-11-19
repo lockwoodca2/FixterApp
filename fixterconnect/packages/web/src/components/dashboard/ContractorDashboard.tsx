@@ -382,7 +382,12 @@ const ContractorDashboard: React.FC = () => {
 
         // Find the job to get scheduledDate
         const job = todaysJobs.find(j => j.id === editingJobId);
-        if (!job) return;
+        if (!job) {
+          setShowScheduleChanges(false);
+          setPendingReorder(null);
+          setAffectedAppointments([]);
+          return;
+        }
 
         const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}/schedule`, {
           method: 'PATCH',
@@ -396,6 +401,9 @@ const ContractorDashboard: React.FC = () => {
 
         if (!response.ok) {
           console.error('Failed to update booking schedule');
+          setShowScheduleChanges(false);
+          setPendingReorder(null);
+          setAffectedAppointments([]);
           return;
         }
 
