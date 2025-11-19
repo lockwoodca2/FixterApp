@@ -821,6 +821,38 @@ const ContractorDetails: React.FC = () => {
                     After-Hours
                   </div>
                 )}
+                {contractor.trustSignals?.isJustJoined && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    backgroundColor: '#fef3c7',
+                    color: '#92400e',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    <Star size={16} />
+                    Just Joined
+                  </div>
+                )}
+                {contractor.trustSignals?.isRisingStar && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    backgroundColor: '#fce7f3',
+                    color: '#9f1239',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    <Award size={16} />
+                    Rising Star
+                  </div>
+                )}
               </div>
 
               {/* Location */}
@@ -1188,30 +1220,20 @@ const ContractorDetails: React.FC = () => {
                 flexDirection: 'column',
                 gap: '16px'
               }}>
-                {contractor.trustSignals?.jobsCompleted > 0 && (
+                {contractor.trustSignals && (
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '8px',
-                      backgroundColor: '#dcfce7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <CheckCircle size={20} color="#10b981" />
-                    </div>
+                    <CheckCircle size={20} color="#64748b" />
                     <div>
                       <div style={{
                         fontSize: '20px',
                         fontWeight: 'bold',
                         color: '#1e293b'
                       }}>
-                        {contractor.trustSignals.jobsCompleted}
+                        {contractor.trustSignals.jobsCompleted || 0}
                       </div>
                       <div style={{
                         fontSize: '13px',
@@ -1229,17 +1251,7 @@ const ContractorDetails: React.FC = () => {
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '8px',
-                      backgroundColor: '#dbeafe',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Clock size={20} color="#3b82f6" />
-                    </div>
+                    <Clock size={20} color="#64748b" />
                     <div>
                       <div style={{
                         fontSize: '20px',
@@ -1264,17 +1276,7 @@ const ContractorDetails: React.FC = () => {
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '8px',
-                      backgroundColor: '#dcfce7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Shield size={20} color="#10b981" />
-                    </div>
+                    <Shield size={20} color="#64748b" />
                     <div>
                       <div style={{
                         fontSize: '20px',

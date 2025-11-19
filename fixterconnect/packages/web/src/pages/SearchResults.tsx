@@ -496,56 +496,41 @@ const SearchResults: React.FC = () => {
               </div>
             )}
 
-            {/* Licensed Badge */}
-            {contractor.licensed === true && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                backgroundColor: '#d1fae5',
-                borderRadius: '4px'
-              }}>
-                <Award size={14} color="#10b981" />
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  color: '#10b981'
+            {/* Just Joined Badge */}
+            {(() => {
+              if (!(contractor as any).createdAt) return null;
+              const accountAge = new Date().getTime() - new Date((contractor as any).createdAt).getTime();
+              const daysSinceJoined = Math.floor(accountAge / (24 * 60 * 60 * 1000));
+              return daysSinceJoined <= 30 && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  backgroundColor: '#fef3c7',
+                  borderRadius: '4px'
                 }}>
-                  LICENSED
-                </span>
-              </div>
-            )}
+                  <Star size={14} color="#92400e" />
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: '#92400e'
+                  }}>
+                    JUST JOINED
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
-          {/* Rating & Reviews */}
+          {/* Trust Signals */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '16px',
-            marginBottom: '8px'
+            marginBottom: '8px',
+            flexWrap: 'wrap'
           }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <Star size={18} fill="#f59e0b" color="#f59e0b" />
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: '#1e293b'
-              }}>
-                {contractor.rating.toFixed(1)}
-              </span>
-              <span style={{
-                fontSize: '14px',
-                color: '#64748b'
-              }}>
-                ({contractor.review_count} reviews)
-              </span>
-            </div>
-
             {contractor.years_in_business && (
               <div style={{
                 fontSize: '14px',

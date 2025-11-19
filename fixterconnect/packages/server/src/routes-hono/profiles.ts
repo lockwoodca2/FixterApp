@@ -152,12 +152,26 @@ profiles.get('/contractor/:id', async (c) => {
 
     // Calculate trust signals
     const contractorId = parseInt(id);
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const fortyFiveDaysAgo = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
 
     // Get total jobs completed
     const jobsCompleted = await prisma.booking.count({
       where: {
         contractorId,
         status: 'COMPLETED'
+      }
+    });
+
+    // Get jobs completed in last 45 days for Rising Star badge
+    const recentJobsCompleted = await prisma.booking.count({
+      where: {
+        contractorId,
+        status: 'COMPLETED',
+        updatedAt: {
+          gte: fortyFiveDaysAgo
+        }
       }
     });
 
@@ -201,6 +215,13 @@ profiles.get('/contractor/:id', async (c) => {
       avgResponseHours = Math.round(totalHours / confirmedBookings.length);
     }
 
+    // Calculate badge eligibility
+    const accountAge = now.getTime() - contractor.createdAt.getTime();
+    const daysSinceJoined = Math.floor(accountAge / (24 * 60 * 60 * 1000));
+
+    const isJustJoined = daysSinceJoined <= 30;
+    const isRisingStar = recentJobsCompleted >= 1 && recentJobsCompleted <= 5;
+
     return c.json({
       success: true,
       contractor: {
@@ -212,7 +233,9 @@ profiles.get('/contractor/:id', async (c) => {
           verified: contractor.verified,
           licensed: contractor.licensed,
           insured: contractor.insured,
-          afterHoursAvailable: contractor.afterHoursAvailable
+          afterHoursAvailable: contractor.afterHoursAvailable,
+          isJustJoined,
+          isRisingStar
         }
       }
     });

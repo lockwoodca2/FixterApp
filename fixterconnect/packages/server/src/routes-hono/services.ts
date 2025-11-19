@@ -163,6 +163,7 @@ services.get('/contractors', async (c) => {
         location: true,
         verified: true,
         licensed: true,
+        createdAt: true,
         services: {
           select: {
             basePrice: true,
@@ -251,6 +252,7 @@ services.get('/contractors/by-service/:id', async (c) => {
         location: true,
         verified: true,
         licensed: true,
+        createdAt: true,
         services: {
           where: {
             serviceId: parseInt(id)
