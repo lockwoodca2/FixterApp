@@ -469,6 +469,39 @@ const ContractorDashboard: React.FC = () => {
     setEditFormData({});
   };
 
+  const handleDeleteJob = async (jobId: number) => {
+    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${jobId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        console.error('Failed to delete booking');
+        alert('Failed to delete job. Please try again.');
+        return;
+      }
+
+      // Remove from local state
+      setTodaysJobs(todaysJobs.filter(job => job.id !== jobId));
+
+      // Close the modal
+      setShowScheduleChanges(false);
+      setPendingReorder(null);
+      setAffectedAppointments([]);
+      setEditingJobId(null);
+      setEditFormData({});
+
+      alert('Job deleted successfully');
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      alert('Failed to delete job. Please try again.');
+    }
+  };
+
   // Calendar drag and drop handlers
   const handleCalendarDragStart = (index: number) => {
     setDraggedCalendarIndex(index);
@@ -4126,6 +4159,27 @@ const ContractorDashboard: React.FC = () => {
                       <span>•</span>
                       <span>✉️ {appointment.client.email}</span>
                     </div>
+
+                    {/* Delete button - only show in edit mode */}
+                    {editingJobId && (
+                      <button
+                        onClick={() => handleDeleteJob(editingJobId)}
+                        style={{
+                          marginTop: '16px',
+                          padding: '10px 16px',
+                          backgroundColor: '#fee2e2',
+                          color: '#dc2626',
+                          border: '1px solid #fca5a5',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          width: '100%'
+                        }}
+                      >
+                        🗑️ Delete Job
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

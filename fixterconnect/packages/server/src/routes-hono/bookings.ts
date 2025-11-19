@@ -596,9 +596,23 @@ bookings.delete('/bookings/:id', async (c) => {
     const prisma = c.get('prisma');
     const { id } = c.req.param();
 
-    const booking = await prisma.booking.update({
-      where: { id: parseInt(id) },
-      data: { status: BookingStatus.CANCELLED }
+    // Update booking and delete time slots in a transaction
+    const booking = await prisma.$transaction(async (tx) => {
+      // Delete associated time slots
+      await tx.timeSlot.deleteMany({
+        where: {
+          OR: [
+            { bookingId: parseInt(id) },
+            { reason: `Booking #${id}` }
+          ]
+        }
+      });
+
+      // Mark booking as cancelled
+      return await tx.booking.update({
+        where: { id: parseInt(id) },
+        data: { status: BookingStatus.CANCELLED }
+      });
     });
 
     return c.json({
