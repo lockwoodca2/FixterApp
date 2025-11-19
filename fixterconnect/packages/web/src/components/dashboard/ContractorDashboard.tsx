@@ -555,9 +555,9 @@ const ContractorDashboard: React.FC = () => {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button style={{
             padding: '10px 20px',
-            backgroundColor: '#4f46e5',
-            color: 'white',
-            border: 'none',
+            backgroundColor: 'transparent',
+            color: '#64748b',
+            border: '1px solid #e2e8f0',
             borderRadius: '8px',
             fontSize: '14px',
             fontWeight: '600',
@@ -567,7 +567,7 @@ const ContractorDashboard: React.FC = () => {
           </button>
           <button style={{
             padding: '10px 20px',
-            backgroundColor: 'white',
+            backgroundColor: 'transparent',
             color: '#64748b',
             border: '1px solid #e2e8f0',
             borderRadius: '8px',
@@ -593,9 +593,9 @@ const ContractorDashboard: React.FC = () => {
             onClick={fetchContractorData}
             style={{
             padding: '10px 20px',
-            backgroundColor: '#f97316',
-            color: 'white',
-            border: 'none',
+            backgroundColor: 'transparent',
+            color: '#64748b',
+            border: '1px solid #e2e8f0',
             borderRadius: '8px',
             fontSize: '14px',
             fontWeight: '600',
