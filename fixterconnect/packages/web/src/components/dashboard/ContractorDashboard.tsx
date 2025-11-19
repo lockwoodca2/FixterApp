@@ -7,7 +7,6 @@ import {
   FileText,
   Clock,
   DollarSign,
-  Star,
   Settings,
   LogOut,
   MapPin,
@@ -16,7 +15,7 @@ import {
   AlertTriangle
 } from 'react-feather';
 
-type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'reviews' | 'settings';
+type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
 
 const ContractorDashboard: React.FC = () => {
   const { logout, user } = useAuth();
@@ -117,7 +116,10 @@ const ContractorDashboard: React.FC = () => {
     description: '',
     yearsInBusiness: '',
     location: '',
-    googleBusinessUrl: ''
+    googleBusinessUrl: '',
+    licensed: false,
+    insured: false,
+    afterHoursAvailable: false
   });
 
   useEffect(() => {
@@ -535,7 +537,6 @@ const ContractorDashboard: React.FC = () => {
     { id: 'history' as ActiveSection, label: 'Job History', icon: Clock },
     { id: 'calendar' as ActiveSection, label: 'Calendar', icon: Calendar },
     { id: 'quotes' as ActiveSection, label: 'Quotes', icon: DollarSign },
-    { id: 'reviews' as ActiveSection, label: 'Reviews', icon: Star },
     { id: 'settings' as ActiveSection, label: 'Settings', icon: Settings }
   ];
 
@@ -2770,36 +2771,6 @@ const ContractorDashboard: React.FC = () => {
     </div>
   );
 
-  const renderReviews = () => (
-    <div style={{ padding: '24px' }}>
-      <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
-        Reviews
-      </h2>
-      {profile && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '24px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          marginBottom: '24px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Star size={32} fill="#fbbf24" color="#fbbf24" />
-            <div>
-              <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
-                {profile.rating.toFixed(1)}
-              </p>
-              <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-                {profile.reviewCount} reviews
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      <p style={{ color: '#94a3b8' }}>Individual reviews coming soon</p>
-    </div>
-  );
-
   // Load settings data when settings tab is active
   useEffect(() => {
     if (activeSection === 'settings' && user?.id) {
@@ -2855,7 +2826,10 @@ const ContractorDashboard: React.FC = () => {
           description: profile.description || '',
           yearsInBusiness: profile.yearsInBusiness?.toString() || '',
           location: profile.location || '',
-          googleBusinessUrl: profile.googleBusinessUrl || ''
+          googleBusinessUrl: profile.googleBusinessUrl || '',
+          licensed: profile.licensed || false,
+          insured: profile.insured || false,
+          afterHoursAvailable: profile.afterHoursAvailable || false
         });
       }
     } catch (error) {
@@ -2867,7 +2841,7 @@ const ContractorDashboard: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/contractors/${user.id}`, {
+      const response = await fetch(`${API_BASE_URL}/contractor/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2877,7 +2851,10 @@ const ContractorDashboard: React.FC = () => {
           description: profileForm.description,
           yearsInBusiness: profileForm.yearsInBusiness ? parseInt(profileForm.yearsInBusiness) : null,
           location: profileForm.location,
-          googleBusinessUrl: profileForm.googleBusinessUrl
+          googleBusinessUrl: profileForm.googleBusinessUrl,
+          licensed: profileForm.licensed,
+          insured: profileForm.insured,
+          afterHoursAvailable: profileForm.afterHoursAvailable
         })
       });
 
@@ -3348,6 +3325,53 @@ const ContractorDashboard: React.FC = () => {
         </p>
       </div>
 
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '12px' }}>
+          Trust Signals
+        </label>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+          These badges help build trust with potential clients. Check the boxes that apply to your business.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={profileForm.licensed}
+              onChange={(e) => setProfileForm({ ...profileForm, licensed: e.target.checked })}
+              style={{ width: '18px', height: '18px', marginRight: '12px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '15px', color: '#1e293b' }}>
+              <strong>Licensed</strong> - I hold required state/local licenses for my services
+            </span>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={profileForm.insured}
+              onChange={(e) => setProfileForm({ ...profileForm, insured: e.target.checked })}
+              style={{ width: '18px', height: '18px', marginRight: '12px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '15px', color: '#1e293b' }}>
+              <strong>Insured</strong> - I carry liability insurance for my business
+            </span>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={profileForm.afterHoursAvailable}
+              onChange={(e) => setProfileForm({ ...profileForm, afterHoursAvailable: e.target.checked })}
+              style={{ width: '18px', height: '18px', marginRight: '12px', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '15px', color: '#1e293b' }}>
+              <strong>After-Hours Available</strong> - I offer services outside regular business hours
+            </span>
+          </label>
+        </div>
+      </div>
+
       <button
         onClick={handleSaveProfile}
         style={{
@@ -3581,8 +3605,6 @@ const ContractorDashboard: React.FC = () => {
         return renderCalendar();
       case 'quotes':
         return renderQuotes();
-      case 'reviews':
-        return renderReviews();
       case 'settings':
         return renderSettings();
       default:

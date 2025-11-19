@@ -721,25 +721,24 @@ const ContractorDetails: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '16px',
-                marginBottom: '12px'
+                marginBottom: '12px',
+                flexWrap: 'wrap'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Star size={24} fill="#f59e0b" color="#f59e0b" />
-                  <span style={{
-                    fontSize: '24px',
-                    fontWeight: 'bold',
-                    color: '#1e293b'
-                  }}>
-                    {(contractor.rating || 0).toFixed(1)}
-                  </span>
-                  <span style={{
-                    fontSize: '16px',
-                    color: '#64748b'
-                  }}>
-                    ({contractor.reviewCount || 0} reviews)
-                  </span>
-                </div>
+                {/* Jobs Completed */}
+                {contractor.trustSignals?.jobsCompleted > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={20} color="#10b981" />
+                    <span style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#1e293b'
+                    }}>
+                      {contractor.trustSignals.jobsCompleted} jobs completed
+                    </span>
+                  </div>
+                )}
 
+                {/* Years in Business */}
                 {contractor.yearsInBusiness && (
                   <div style={{
                     display: 'flex',
@@ -751,6 +750,93 @@ const ContractorDetails: React.FC = () => {
                     <span style={{ fontSize: '16px' }}>
                       {contractor.yearsInBusiness} years in business
                     </span>
+                  </div>
+                )}
+
+                {/* Response Time */}
+                {contractor.trustSignals?.avgResponseHours !== null && contractor.trustSignals?.avgResponseHours !== undefined && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#64748b'
+                  }}>
+                    <Clock size={18} />
+                    <span style={{ fontSize: '16px' }}>
+                      Responds in {contractor.trustSignals.avgResponseHours < 1 ? '<1 hour' : `${contractor.trustSignals.avgResponseHours} hours`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Last Booked */}
+                {contractor.trustSignals?.lastBookedAt && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#64748b'
+                  }}>
+                    <Calendar size={18} />
+                    <span style={{ fontSize: '16px' }}>
+                      Last booked {new Date(contractor.trustSignals.lastBookedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Trust Badges */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '12px',
+                flexWrap: 'wrap'
+              }}>
+                {contractor.trustSignals?.licensed && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    backgroundColor: '#dbeafe',
+                    color: '#1e40af',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    <CheckCircle size={16} />
+                    Licensed
+                  </div>
+                )}
+                {contractor.trustSignals?.insured && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    backgroundColor: '#d1fae5',
+                    color: '#065f46',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    <Shield size={16} />
+                    Insured
+                  </div>
+                )}
+                {contractor.trustSignals?.afterHoursAvailable && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    backgroundColor: '#fef3c7',
+                    color: '#92400e',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    <Clock size={16} />
+                    After-Hours
                   </div>
                 )}
               </div>
@@ -1120,71 +1206,75 @@ const ContractorDetails: React.FC = () => {
                 flexDirection: 'column',
                 gap: '16px'
               }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
+                {contractor.trustSignals?.jobsCompleted > 0 && (
                   <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: '#fef3c7',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    gap: '12px'
                   }}>
-                    <Star size={20} color="#f59e0b" />
-                  </div>
-                  <div>
                     <div style={{
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      color: '#1e293b'
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      backgroundColor: '#dcfce7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}>
-                      {(contractor.rating || 0).toFixed(1)}
+                      <CheckCircle size={20} color="#10b981" />
                     </div>
-                    <div style={{
-                      fontSize: '13px',
-                      color: '#64748b'
-                    }}>
-                      Average Rating
+                    <div>
+                      <div style={{
+                        fontSize: '20px',
+                        fontWeight: 'bold',
+                        color: '#1e293b'
+                      }}>
+                        {contractor.trustSignals.jobsCompleted}
+                      </div>
+                      <div style={{
+                        fontSize: '13px',
+                        color: '#64748b'
+                      }}>
+                        Jobs Completed
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
+                {contractor.trustSignals?.avgResponseHours !== null && contractor.trustSignals?.avgResponseHours !== undefined && (
                   <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: '#dbeafe',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    gap: '12px'
                   }}>
-                    <Users size={20} color="#3b82f6" />
-                  </div>
-                  <div>
                     <div style={{
-                      fontSize: '20px',
-                      fontWeight: 'bold',
-                      color: '#1e293b'
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      backgroundColor: '#dbeafe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}>
-                      {contractor.reviewCount || 0}
+                      <Clock size={20} color="#3b82f6" />
                     </div>
-                    <div style={{
-                      fontSize: '13px',
-                      color: '#64748b'
-                    }}>
-                      Total Reviews
+                    <div>
+                      <div style={{
+                        fontSize: '20px',
+                        fontWeight: 'bold',
+                        color: '#1e293b'
+                      }}>
+                        {contractor.trustSignals.avgResponseHours < 1 ? '<1' : contractor.trustSignals.avgResponseHours}
+                      </div>
+                      <div style={{
+                        fontSize: '13px',
+                        color: '#64748b'
+                      }}>
+                        Hour Response
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {contractor.yearsInBusiness && (
                   <div style={{

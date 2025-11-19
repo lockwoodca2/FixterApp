@@ -150,9 +150,71 @@ profiles.get('/contractor/:id', async (c) => {
       }, 404);
     }
 
+    // Calculate trust signals
+    const contractorId = parseInt(id);
+
+    // Get total jobs completed
+    const jobsCompleted = await prisma.booking.count({
+      where: {
+        contractorId,
+        status: 'COMPLETED'
+      }
+    });
+
+    // Get last booking date
+    const lastBooking = await prisma.booking.findFirst({
+      where: {
+        contractorId,
+        status: {
+          in: ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED']
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      select: {
+        createdAt: true
+      }
+    });
+
+    // Calculate average response time (hours) from bookings created to confirmed
+    const confirmedBookings = await prisma.booking.findMany({
+      where: {
+        contractorId,
+        status: {
+          in: ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED']
+        }
+      },
+      select: {
+        createdAt: true,
+        updatedAt: true
+      },
+      take: 20 // Last 20 bookings for average
+    });
+
+    let avgResponseHours = null;
+    if (confirmedBookings.length > 0) {
+      const totalHours = confirmedBookings.reduce((sum, booking) => {
+        const diffMs = booking.updatedAt.getTime() - booking.createdAt.getTime();
+        return sum + (diffMs / (1000 * 60 * 60)); // Convert ms to hours
+      }, 0);
+      avgResponseHours = Math.round(totalHours / confirmedBookings.length);
+    }
+
     return c.json({
       success: true,
-      contractor
+      contractor: {
+        ...contractor,
+        trustSignals: {
+          jobsCompleted,
+          lastBookedAt: lastBooking?.createdAt || null,
+          avgResponseHours,
+          verified: contractor.verified,
+          licensed: contractor.licensed,
+          insured: contractor.insured,
+          afterHoursAvailable: contractor.afterHoursAvailable
+        }
+      }
     });
   } catch (error) {
     console.error('Get contractor profile error:', error);
@@ -177,7 +239,9 @@ profiles.put('/contractor/:id', async (c) => {
       location,
       googleBusinessUrl,
       verified,
-      licensed
+      licensed,
+      insured,
+      afterHoursAvailable
     } = await c.req.json();
 
     const updateData: any = {};
@@ -191,6 +255,8 @@ profiles.put('/contractor/:id', async (c) => {
     if (googleBusinessUrl !== undefined) updateData.googleBusinessUrl = googleBusinessUrl;
     if (verified !== undefined) updateData.verified = verified;
     if (licensed !== undefined) updateData.licensed = licensed;
+    if (insured !== undefined) updateData.insured = insured;
+    if (afterHoursAvailable !== undefined) updateData.afterHoursAvailable = afterHoursAvailable;
 
     const contractor = await prisma.contractor.update({
       where: { id: parseInt(id) },
