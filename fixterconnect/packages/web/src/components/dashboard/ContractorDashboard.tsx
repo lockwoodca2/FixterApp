@@ -371,7 +371,27 @@ const ContractorDashboard: React.FC = () => {
   };
 
   const handleAcceptScheduleChanges = (notifyCustomers: boolean) => {
-    if (pendingReorder) {
+    if (editingJobId) {
+      // Handle single job edit
+      const updatedJobs = todaysJobs.map(job =>
+        job.id === editingJobId
+          ? {
+              ...job,
+              scheduledTime: `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`,
+              duration: `${editFormData.duration} min`
+            }
+          : job
+      );
+      setTodaysJobs(updatedJobs);
+
+      if (notifyCustomers) {
+        // TODO: Send notification to the customer
+        console.log('Sending notification to customer for job edit...');
+      }
+
+      setEditingJobId(null);
+      setEditFormData({});
+    } else if (pendingReorder) {
       // Apply the new schedule with calculated times
       const updatedJobs = pendingReorder.map((job, index) => {
         if (index === 0) return job;
@@ -405,6 +425,8 @@ const ContractorDashboard: React.FC = () => {
     setShowScheduleChanges(false);
     setPendingReorder(null);
     setAffectedAppointments([]);
+    setEditingJobId(null);
+    setEditFormData({});
   };
 
   // Calendar drag and drop handlers
@@ -487,45 +509,23 @@ const ContractorDashboard: React.FC = () => {
 
   // Edit handlers
   const handleEditJob = (job: any) => {
-    // Show warning about customer notification
-    const confirmed = window.confirm(
-      `Editing this appointment's time or duration will affect the schedule.\n\nThe customer will be notified of any changes.\n\nDo you want to proceed?`
-    );
+    // Create an affected appointment entry for the single job being edited
+    const affectedAppointment = {
+      ...job,
+      previousTime: job.scheduledTime,
+      newTime: job.scheduledTime, // Will be updated by user in modal
+      client: job.client
+    };
 
-    if (confirmed) {
-      setEditingJobId(job.id);
-      setEditFormData({
-        startTime: job.scheduledTime?.split(' - ')[0] || '',
-        duration: job.duration || '90'
-      });
-    }
+    setAffectedAppointments([affectedAppointment]);
+    setEditingJobId(job.id);
+    setEditFormData({
+      startTime: job.scheduledTime?.split(' - ')[0] || '',
+      duration: job.duration?.replace(' min', '') || '90'
+    });
+    setShowScheduleChanges(true);
   };
 
-  const handleSaveEdit = async (jobId: number) => {
-    try {
-      // Here you would make an API call to update the job
-      // For now, just update locally
-      const updatedJobs = todaysJobs.map(job =>
-        job.id === jobId
-          ? {
-              ...job,
-              scheduledTime: `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`,
-              duration: `${editFormData.duration} min`
-            }
-          : job
-      );
-      setTodaysJobs(updatedJobs);
-      setEditingJobId(null);
-      setEditFormData({});
-    } catch (error) {
-      console.error('Error saving job edit:', error);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingJobId(null);
-    setEditFormData({});
-  };
 
   const calculateEndTime = (startTime: string, durationMin: string) => {
     // Simple time calculation helper
@@ -621,10 +621,7 @@ const ContractorDashboard: React.FC = () => {
         <p style={{ color: '#64748b' }}>Loading...</p>
       ) : todaysJobs.length > 0 ? (
         <div style={{ display: 'grid', gap: '20px' }}>
-          {todaysJobs.map((job, index) => {
-            const isEditing = editingJobId === job.id;
-
-            return (
+          {todaysJobs.map((job, index) => (
               <div
                 key={job.id}
                 draggable
@@ -688,85 +685,22 @@ const ContractorDashboard: React.FC = () => {
                     {job.client.firstName} {job.client.lastName}
                   </h3>
 
-                  {isEditing ? (
-                    // Edit Mode
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <label style={{ fontSize: '14px', color: '#64748b' }}>Start:</label>
-                        <input
-                          type="time"
-                          value={editFormData.startTime}
-                          onChange={(e) => setEditFormData({ ...editFormData, startTime: e.target.value })}
-                          style={{
-                            padding: '6px 12px',
-                            border: '2px solid #e2e8f0',
-                            borderRadius: '6px',
-                            fontSize: '14px'
-                          }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <label style={{ fontSize: '14px', color: '#64748b' }}>Duration (min):</label>
-                        <input
-                          type="number"
-                          value={editFormData.duration}
-                          onChange={(e) => setEditFormData({ ...editFormData, duration: e.target.value })}
-                          style={{
-                            padding: '6px 12px',
-                            border: '2px solid #e2e8f0',
-                            borderRadius: '6px',
-                            fontSize: '14px',
-                            width: '80px'
-                          }}
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleSaveEdit(job.id)}
-                        style={{
-                          padding: '6px 16px',
-                          backgroundColor: '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}>
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        style={{
-                          padding: '6px 16px',
-                          backgroundColor: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}>
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    // View Mode
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '15px', marginBottom: '12px' }}>
-                      <span>{job.service.name}</span>
-                      <span>•</span>
-                      <span>{job.scheduledTime}</span>
-                      <span style={{ marginLeft: '4px' }}>({job.duration || '90 min'})</span>
-                      <Edit2
-                        size={16}
-                        onClick={() => handleEditJob(job)}
-                        style={{
-                          cursor: 'pointer',
-                          color: '#4f46e5',
-                          marginLeft: '4px'
-                        }}
-                      />
-                    </div>
-                  )}
+                  {/* View Mode */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '15px', marginBottom: '12px' }}>
+                    <span>{job.service.name}</span>
+                    <span>•</span>
+                    <span>{job.scheduledTime}</span>
+                    <span style={{ marginLeft: '4px' }}>({job.duration || '90 min'})</span>
+                    <Edit2
+                      size={16}
+                      onClick={() => handleEditJob(job)}
+                      style={{
+                        cursor: 'pointer',
+                        color: '#4f46e5',
+                        marginLeft: '4px'
+                      }}
+                    />
+                  </div>
 
                   {/* Contact Info */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#64748b', fontSize: '14px' }}>
@@ -824,8 +758,7 @@ const ContractorDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       ) : (
         <div style={{
@@ -3783,7 +3716,9 @@ const ContractorDashboard: React.FC = () => {
               color: '#64748b',
               marginBottom: '24px'
             }}>
-              Reordering jobs will change {affectedAppointments.length} appointment time{affectedAppointments.length !== 1 ? 's' : ''}. Review the changes and notify affected customers.
+              {editingJobId
+                ? 'Edit the appointment time and duration below. The customer will be notified of changes.'
+                : `Reordering jobs will change ${affectedAppointments.length} appointment time${affectedAppointments.length !== 1 ? 's' : ''}. Review the changes and notify affected customers.`}
             </p>
 
             {/* Affected Appointments */}
@@ -3830,41 +3765,140 @@ const ContractorDashboard: React.FC = () => {
                       {appointment.client.firstName} {appointment.client.lastName}
                     </h4>
 
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      marginBottom: '8px'
-                    }}>
-                      <div>
-                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block' }}>
-                          Previous Time
-                        </span>
-                        <span style={{
-                          fontSize: '14px',
-                          color: '#ef4444',
-                          fontWeight: '600',
-                          textDecoration: 'line-through'
+                    {editingJobId ? (
+                      // Edit Mode - Show input fields
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        marginBottom: '12px'
+                      }}>
+                        <div>
+                          <label style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontWeight: '600'
+                          }}>
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            value={editFormData.startTime}
+                            onChange={(e) => {
+                              setEditFormData({ ...editFormData, startTime: e.target.value });
+                              // Update the new time display
+                              const updatedAppointments = [...affectedAppointments];
+                              updatedAppointments[0] = {
+                                ...updatedAppointments[0],
+                                newTime: `${e.target.value} - ${calculateEndTime(e.target.value, editFormData.duration)}`
+                              };
+                              setAffectedAppointments(updatedAppointments);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '8px',
+                              fontSize: '14px'
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontWeight: '600'
+                          }}>
+                            Duration (minutes)
+                          </label>
+                          <input
+                            type="number"
+                            value={editFormData.duration}
+                            onChange={(e) => {
+                              setEditFormData({ ...editFormData, duration: e.target.value });
+                              // Update the new time display
+                              const updatedAppointments = [...affectedAppointments];
+                              updatedAppointments[0] = {
+                                ...updatedAppointments[0],
+                                newTime: `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, e.target.value)}`
+                              };
+                              setAffectedAppointments(updatedAppointments);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '8px',
+                              fontSize: '14px'
+                            }}
+                          />
+                        </div>
+                        <div style={{
+                          backgroundColor: '#f1f5f9',
+                          padding: '12px',
+                          borderRadius: '6px',
+                          marginTop: '8px'
                         }}>
-                          {appointment.previousTime}
-                        </span>
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            marginBottom: '4px'
+                          }}>
+                            Preview:
+                          </div>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            color: '#10b981'
+                          }}>
+                            {editFormData.startTime && editFormData.duration
+                              ? `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)} (${editFormData.duration} min)`
+                              : 'Enter time and duration'}
+                          </div>
+                        </div>
                       </div>
+                    ) : (
+                      // View Mode - Show time comparison
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        marginBottom: '8px'
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block' }}>
+                            Previous Time
+                          </span>
+                          <span style={{
+                            fontSize: '14px',
+                            color: '#ef4444',
+                            fontWeight: '600',
+                            textDecoration: 'line-through'
+                          }}>
+                            {appointment.previousTime}
+                          </span>
+                        </div>
 
-                      <span style={{ color: '#94a3b8' }}>→</span>
+                        <span style={{ color: '#94a3b8' }}>→</span>
 
-                      <div>
-                        <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block' }}>
-                          New Time
-                        </span>
-                        <span style={{
-                          fontSize: '14px',
-                          color: '#10b981',
-                          fontWeight: '600'
-                        }}>
-                          {appointment.newTime}
-                        </span>
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block' }}>
+                            New Time
+                          </span>
+                          <span style={{
+                            fontSize: '14px',
+                            color: '#10b981',
+                            fontWeight: '600'
+                          }}>
+                            {appointment.newTime}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <div style={{
                       fontSize: '13px',
@@ -3882,21 +3916,23 @@ const ContractorDashboard: React.FC = () => {
             </div>
 
             {/* Note */}
-            <div style={{
-              backgroundColor: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              borderRadius: '8px',
-              padding: '16px',
-              marginBottom: '24px'
-            }}>
-              <p style={{
-                fontSize: '14px',
-                color: '#1e40af',
-                margin: 0
+            {!editingJobId && (
+              <div style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
               }}>
-                <strong>Note:</strong> The first job time ({(activeSection === 'calendar' ? selectedDateJobs[0] : todaysJobs[0])?.scheduledTime?.split(' - ')[0]}) remains unchanged. Subsequent jobs are automatically scheduled with 15 minutes travel time between appointments.
-              </p>
-            </div>
+                <p style={{
+                  fontSize: '14px',
+                  color: '#1e40af',
+                  margin: 0
+                }}>
+                  <strong>Note:</strong> The first job time ({(activeSection === 'calendar' ? selectedDateJobs[0] : todaysJobs[0])?.scheduledTime?.split(' - ')[0]}) remains unchanged. Subsequent jobs are automatically scheduled with 15 minutes travel time between appointments.
+                </p>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
