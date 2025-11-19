@@ -13,7 +13,8 @@ import {
   X,
   Flag,
   AlertTriangle,
-  Edit2
+  Edit2,
+  CheckCircle
 } from 'react-feather';
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
