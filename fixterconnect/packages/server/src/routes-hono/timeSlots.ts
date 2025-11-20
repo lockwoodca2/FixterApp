@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client/edge';
+import type { Env } from '../worker';
 import {
   calculateJobSlots,
   hasConflict,
@@ -9,8 +10,11 @@ import {
   TimeSlot
 } from '../utils/timeSlots';
 
-const app = new Hono();
-const prisma = new PrismaClient();
+type Variables = {
+  prisma: PrismaClient;
+};
+
+const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 /**
  * GET /api/time-slots/contractor/:contractorId/date/:date
@@ -18,6 +22,7 @@ const prisma = new PrismaClient();
  */
 app.get('/contractor/:contractorId/date/:date', async (c) => {
   try {
+    const prisma = c.get('prisma');
     const contractorId = parseInt(c.req.param('contractorId'));
     const dateParam = c.req.param('date');
 
@@ -50,6 +55,7 @@ app.get('/contractor/:contractorId/date/:date', async (c) => {
  */
 app.post('/check-availability', async (c) => {
   try {
+    const prisma = c.get('prisma');
     const { contractorId, date, startTime, durationMinutes, excludeBookingId } = await c.req.json();
 
     const dateObj = new Date(date);
@@ -148,6 +154,7 @@ app.post('/check-availability', async (c) => {
  */
 app.post('/create', async (c) => {
   try {
+    const prisma = c.get('prisma');
     const { contractorId, bookingId, date, startTime, durationMinutes } = await c.req.json();
 
     const dateObj = new Date(date);
@@ -197,6 +204,7 @@ app.post('/create', async (c) => {
  */
 app.delete('/booking/:bookingId', async (c) => {
   try {
+    const prisma = c.get('prisma');
     const bookingId = parseInt(c.req.param('bookingId'));
 
     await prisma.timeSlot.deleteMany({
@@ -221,6 +229,7 @@ app.delete('/booking/:bookingId', async (c) => {
  */
 app.put('/booking/:bookingId', async (c) => {
   try {
+    const prisma = c.get('prisma');
     const bookingId = parseInt(c.req.param('bookingId'));
     const { contractorId, date, startTime, durationMinutes } = await c.req.json();
 
