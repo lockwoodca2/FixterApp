@@ -116,7 +116,7 @@ const ContractorDetails: React.FC = () => {
     // Generate hourly time slots based on start and end time
     const startHour = parseInt(availEntry.startTime?.split(':')[0] || '8');
     const endHour = parseInt(availEntry.endTime?.split(':')[0] || '17');
-    const potentialSlots = [];
+    const potentialSlots: Array<{ time24: string; time12: string }> = [];
 
     for (let hour = startHour; hour < endHour && hour < 17; hour++) {
       potentialSlots.push({
@@ -125,32 +125,39 @@ const ContractorDetails: React.FC = () => {
       });
     }
 
-    // Check each time slot for availability using the time slots API
-    const availableSlots = [];
-    for (const slot of potentialSlots) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/time-slots/check-availability`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contractorId: contractor.id,
-            date: date,
-            startTime: slot.time24,
-            durationMinutes: 90 // Default duration for checking availability
+    // Check all time slots in a single batch request
+    try {
+      const response = await fetch(`${API_BASE_URL}/time-slots/check-availability-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: contractor.id,
+          date: date,
+          timeSlots: potentialSlots.map(s => s.time24),
+          durationMinutes: 90 // Default duration for checking availability
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.results) {
+        // Filter available slots and convert to 12-hour format
+        const availableSlots = data.results
+          .filter((result: any) => result.isAvailable)
+          .map((result: any) => {
+            const slot = potentialSlots.find(s => s.time24 === result.startTime);
+            return slot?.time12;
           })
-        });
+          .filter(Boolean);
 
-        const data = await response.json();
-
-        if (data.success && data.isAvailable) {
-          availableSlots.push(slot.time12);
-        }
-      } catch (error) {
-        console.error('Error checking time slot availability:', error);
+        setAvailableTimeSlots(availableSlots);
+      } else {
+        setAvailableTimeSlots([]);
       }
+    } catch (error) {
+      console.error('Error checking time slot availability:', error);
+      setAvailableTimeSlots([]);
     }
-
-    setAvailableTimeSlots(availableSlots);
   };
 
   const handleBooking = async () => {

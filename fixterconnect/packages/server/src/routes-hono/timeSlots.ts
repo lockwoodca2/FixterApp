@@ -50,6 +50,75 @@ app.get('/contractor/:contractorId/date/:date', async (c) => {
 });
 
 /**
+ * POST /api/time-slots/check-availability-batch
+ * Check multiple time slots at once for availability
+ */
+app.post('/check-availability-batch', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId, date, timeSlots, durationMinutes } = await c.req.json();
+
+    const dateObj = new Date(date);
+    dateObj.setHours(0, 0, 0, 0);
+
+    // Get all existing slots for this date once
+    const existingSlots = await prisma.timeSlot.findMany({
+      where: {
+        contractorId,
+        date: {
+          gte: dateObj,
+          lt: new Date(dateObj.getTime() + 24 * 60 * 60 * 1000)
+        }
+      },
+      orderBy: {
+        startTime: 'asc'
+      }
+    });
+
+    const existingTimeRanges = existingSlots.map(s => ({
+      startTime: s.startTime,
+      endTime: s.endTime
+    }));
+
+    // Check each time slot
+    const results = timeSlots.map((startTime: string) => {
+      const { jobSlots, travelSlots } = calculateJobSlots(startTime, durationMinutes, true);
+      const allProposedSlots = [...jobSlots, ...travelSlots];
+
+      // Check for conflicts
+      const hasAnyConflict = allProposedSlots.some(proposedSlot => {
+        const conflictingSlots = getConflictingSlots(
+          proposedSlot.startTime,
+          proposedSlot.endTime,
+          existingSlots.map(s => ({
+            date: s.date,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            slotType: s.slotType as 'JOB' | 'TRAVEL' | 'BLOCKED',
+            bookingId: s.bookingId || undefined,
+            reason: s.reason || undefined
+          }))
+        );
+        return conflictingSlots.length > 0;
+      });
+
+      return {
+        startTime,
+        isAvailable: !hasAnyConflict
+      };
+    });
+
+    return c.json({
+      success: true,
+      results
+    });
+  } catch (error) {
+    console.error('Error checking batch availability:', error);
+    return c.json({ success: false, error: 'Failed to check availability' }, 500);
+  }
+});
+
+/**
  * POST /api/time-slots/check-availability
  * Check if a time slot is available and find conflicts
  */
