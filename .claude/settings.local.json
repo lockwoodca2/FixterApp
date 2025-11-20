@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm run seed:*)",
       "Bash(npm run build:*)",
-      "Bash(npx prisma migrate:*)"
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx wrangler deploy:*)"
     ],
     "deny": [],
     "ask": []
