@@ -72,6 +72,10 @@ bookings.post('/bookings', async (c) => {
     // Parse scheduledTime to get start time (e.g., "09:00 - 11:30" -> "09:00")
     const startTime = scheduledTime.split(' - ')[0] || scheduledTime;
 
+    // Parse date without timezone shift (treat as local date)
+    const [year, month, day] = scheduledDate.split('-').map(Number);
+    const scheduledDateObj = new Date(year, month - 1, day);
+
     // Create booking and time slots in a transaction
     const booking = await prisma.$transaction(async (tx) => {
       // Create the booking
@@ -81,7 +85,7 @@ bookings.post('/bookings', async (c) => {
           clientId,
           serviceId,
           serviceAddress,
-          scheduledDate: new Date(scheduledDate),
+          scheduledDate: scheduledDateObj,
           scheduledTime,
           estimatedDuration,
           price: price || null,
@@ -117,7 +121,8 @@ bookings.post('/bookings', async (c) => {
       // Calculate job and travel slots
       const { jobSlots, travelSlots } = calculateJobSlots(startTime, estimatedDuration, true);
 
-      const dateObj = new Date(scheduledDate);
+      // Use the already parsed date object with hours set to midnight
+      const dateObj = new Date(scheduledDateObj);
       dateObj.setHours(0, 0, 0, 0);
 
       // Create job slots
@@ -446,13 +451,20 @@ bookings.patch('/bookings/:id/schedule', async (c) => {
       }, 404);
     }
 
+    // Parse date without timezone shift if provided
+    let scheduledDateObj;
+    if (scheduledDate) {
+      const [year, month, day] = scheduledDate.split('-').map(Number);
+      scheduledDateObj = new Date(year, month - 1, day);
+    }
+
     // Update booking and time slots in a transaction
     const booking = await prisma.$transaction(async (tx) => {
       // Update the booking
       const updatedBooking = await tx.booking.update({
         where: { id: parseInt(id) },
         data: {
-          scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
+          scheduledDate: scheduledDateObj || undefined,
           scheduledTime: scheduledTime || undefined,
           estimatedDuration: estimatedDuration || undefined
         },

@@ -294,14 +294,20 @@ const ContractorDetails: React.FC = () => {
     const days = [];
     const today = new Date();
 
+    // Use local date components to avoid timezone issues
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const day = today.getDate();
+
     for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
+      const date = new Date(year, month, day + i);
+      const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
       days.push({
-        date: date.toISOString().split('T')[0],
+        date: dateString,
         dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
         dayNumber: date.getDate(),
-        available: isDateAvailable(date.toISOString().split('T')[0])
+        available: isDateAvailable(dateString)
       });
     }
 
