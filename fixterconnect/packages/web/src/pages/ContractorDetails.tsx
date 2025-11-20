@@ -160,6 +160,19 @@ const ContractorDetails: React.FC = () => {
     }
   };
 
+  const convertTo24Hour = (time12: string): string => {
+    const [time, period] = time12.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
   const handleBooking = async () => {
     if (!selectedService || !selectedDate || !selectedTime) {
       alert('Please select a service, date, and time');
@@ -185,6 +198,9 @@ const ContractorDetails: React.FC = () => {
         throw new Error('Service not found');
       }
 
+      // Convert time to 24-hour format for backend
+      const time24 = convertTo24Hour(selectedTime);
+
       // Submit booking to backend
       const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
@@ -197,7 +213,7 @@ const ContractorDetails: React.FC = () => {
           serviceId: service.service.id,
           serviceAddress: serviceAddress,
           scheduledDate: selectedDate,
-          scheduledTime: selectedTime,
+          scheduledTime: time24,
           price: null
         })
       });
@@ -206,6 +222,9 @@ const ContractorDetails: React.FC = () => {
 
       if (data.success) {
         alert(`Booking request submitted successfully!\n\nService: ${selectedService}\nDate: ${selectedDate}\nTime: ${selectedTime}\n\nThe contractor will confirm your booking soon.`);
+
+        // Refresh available time slots for this date to reflect the new booking
+        await loadAvailableTimeSlots(selectedDate);
 
         // Reset form
         setShowBookingModal(false);
