@@ -100,8 +100,6 @@ const ContractorDetails: React.FC = () => {
   }, [selectedDate, availabilityData]);
 
   const loadAvailableTimeSlots = async (date: string) => {
-    console.log('Loading available time slots for date:', date);
-
     // Find availability entry for selected date
     // The API returns dates as ISO strings, so we need to normalize for comparison
     const availEntry = availabilityData.find(
@@ -111,10 +109,7 @@ const ContractorDetails: React.FC = () => {
       }
     );
 
-    console.log('Availability entry found:', availEntry);
-
     if (!availEntry || !contractor) {
-      console.log('No availability entry or contractor, setting empty slots');
       setAvailableTimeSlots([]);
       return;
     }
@@ -130,8 +125,6 @@ const ContractorDetails: React.FC = () => {
         time12: hour > 12 ? `${hour - 12}:00 PM` : hour === 12 ? '12:00 PM' : `${hour}:00 AM`
       });
     }
-
-    console.log('Potential time slots:', potentialSlots);
 
     // Check each time slot for availability using the time slots API
     const availableSlots = [];
@@ -149,7 +142,6 @@ const ContractorDetails: React.FC = () => {
         });
 
         const data = await response.json();
-        console.log(`Slot ${slot.time24} availability:`, data);
 
         if (data.success && data.isAvailable) {
           availableSlots.push(slot.time12);
@@ -159,7 +151,6 @@ const ContractorDetails: React.FC = () => {
       }
     }
 
-    console.log('Final available slots:', availableSlots);
     setAvailableTimeSlots(availableSlots);
   };
 
