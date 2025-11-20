@@ -400,7 +400,6 @@ const ContractorDashboard: React.FC = () => {
 
           if (notifyCustomers) {
             // TODO: Send notification to the customer about cancellation
-            console.log('Sending cancellation notification to customer...');
           }
 
           setEditingJobId(null);
@@ -456,7 +455,6 @@ const ContractorDashboard: React.FC = () => {
 
           if (notifyCustomers) {
             // TODO: Send notification to the customer
-            console.log('Sending notification to customer for job edit...');
           }
 
           setEditingJobId(null);
@@ -488,7 +486,6 @@ const ContractorDashboard: React.FC = () => {
 
       if (notifyCustomers) {
         // TODO: Send notifications to affected customers
-        console.log('Sending notifications to customers...');
       }
     }
 
@@ -575,7 +572,6 @@ const ContractorDashboard: React.FC = () => {
 
       if (notifyCustomers) {
         // TODO: Send notifications to affected customers
-        console.log('Sending notifications to customers...');
       }
     }
 
@@ -1181,7 +1177,6 @@ const ContractorDashboard: React.FC = () => {
           return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
         });
 
-        console.log('Fetched monthly bookings:', filtered);
         setMonthlyBookings(filtered);
       } catch (error) {
         console.error('Error fetching monthly bookings:', error);
@@ -1227,9 +1222,6 @@ const ContractorDashboard: React.FC = () => {
     const handleDateClick = (date: Date) => {
       setSelectedDate(date);
       const jobsForDate = getBookingsForDate(date);
-      console.log('Clicked date:', date);
-      console.log('Jobs for date:', jobsForDate);
-      console.log('Total monthly bookings:', monthlyBookings);
       setSelectedDateJobs(jobsForDate);
       setCalendarView('list');
     };
