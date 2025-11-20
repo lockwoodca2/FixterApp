@@ -289,7 +289,7 @@ const ContractorDetails: React.FC = () => {
     return !!availEntry;
   };
 
-  // Get next 30 days for calendar display
+  // Get next 30 days for calendar display with proper day-of-week alignment
   const getNext30Days = () => {
     const days = [];
     const today = new Date();
@@ -299,6 +299,22 @@ const ContractorDetails: React.FC = () => {
     const month = today.getMonth();
     const day = today.getDate();
 
+    // Get the first date
+    const firstDate = new Date(year, month, day);
+    const firstDayOfWeek = firstDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    // Add empty padding cells for days before the first date to align with correct day of week
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push({
+        date: '',
+        dayName: '',
+        dayNumber: null,
+        available: false,
+        isEmpty: true
+      });
+    }
+
+    // Add actual dates
     for (let i = 0; i < 30; i++) {
       const date = new Date(year, month, day + i);
       const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -307,7 +323,8 @@ const ContractorDetails: React.FC = () => {
         date: dateString,
         dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
         dayNumber: date.getDate(),
-        available: isDateAvailable(dateString)
+        available: isDateAvailable(dateString),
+        isEmpty: false
       });
     }
 
@@ -1188,8 +1205,17 @@ const ContractorDetails: React.FC = () => {
                 gridTemplateColumns: 'repeat(7, 1fr)',
                 gap: '6px'
               }}>
-                {getNext30Days().slice(0, 14).map((day) => {
-                  const isToday = day.date === new Date().toISOString().split('T')[0];
+                {(() => {
+                  const allDays = getNext30Days();
+                  // Count empty padding cells at the start
+                  const paddingCount = allDays.filter(d => d.isEmpty).length;
+                  // Show 14 actual dates plus the padding
+                  return allDays.slice(0, 14 + paddingCount).map((day, index) => {
+                    if (day.isEmpty) {
+                      return <div key={`empty-${index}`} />;
+                    }
+
+                    const isToday = day.date === new Date().toISOString().split('T')[0];
 
                   return (
                     <div
@@ -1221,7 +1247,8 @@ const ContractorDetails: React.FC = () => {
                       )}
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
 
               <div style={{
