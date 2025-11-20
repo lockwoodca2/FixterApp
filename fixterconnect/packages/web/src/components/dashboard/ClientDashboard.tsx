@@ -63,14 +63,6 @@ const ClientDashboard: React.FC = () => {
     }
   }, [user]);
 
-  // Debug: Track modal state changes
-  useEffect(() => {
-    console.log('Modal state changed:', {
-      showChatModal,
-      selectedConversation,
-      shouldShow: showChatModal && selectedConversation
-    });
-  }, [showChatModal, selectedConversation]);
 
   const fetchClientData = async () => {
     try {
@@ -1229,25 +1221,17 @@ const ClientDashboard: React.FC = () => {
   };
 
   const handleMessageProvider = async (service: any) => {
-    console.log('handleMessageProvider called with service:', service);
-    console.log('Current conversations:', conversations);
-    console.log('Current user:', user);
-
     try {
       // Check if there's already a conversation with this contractor
       const existingConversation = conversations.find(
         conv => conv.contractorId === service.providerId
       );
 
-      console.log('Existing conversation found:', existingConversation);
-
       if (existingConversation) {
         // Open existing conversation
-        console.log('Opening existing conversation');
         await handleOpenChat(existingConversation);
       } else {
         // Create new message thread
-        console.log('Creating new message thread');
         const response = await fetch(`${API_BASE_URL}/messages`, {
           method: 'POST',
           headers: {
@@ -1261,7 +1245,6 @@ const ClientDashboard: React.FC = () => {
         });
 
         const data = await response.json();
-        console.log('Create message response:', data);
 
         if (data.success) {
           // Open the newly created conversation
@@ -1290,17 +1273,12 @@ const ClientDashboard: React.FC = () => {
   };
 
   const handleOpenChat = async (conversation: any) => {
-    console.log('handleOpenChat called with conversation:', conversation);
     try {
       // Fetch full conversation with all messages
-      console.log('Fetching conversation details from:', `${API_BASE_URL}/messages/${conversation.id}`);
       const response = await fetch(`${API_BASE_URL}/messages/${conversation.id}`);
-      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (data.success) {
-        console.log('Processing messages...');
         // Transform chat messages to match UI format
         const transformedMessages = data.message.chatMessages.map((msg: any) => ({
           sender: msg.sender === 'CLIENT' ? 'client' : 'contractor',
@@ -1311,18 +1289,15 @@ const ClientDashboard: React.FC = () => {
           })
         }));
 
-        console.log('Setting selected conversation and opening modal');
         const newConv = {
           ...conversation,
           messages: transformedMessages
         };
-        console.log('New conversation object:', newConv);
 
         // Use setTimeout to ensure state updates trigger re-render
         setTimeout(() => {
           setSelectedConversation(newConv);
           setShowChatModal(true);
-          console.log('Chat modal state updated');
         }, 0);
 
         // Mark conversation as read
@@ -2533,7 +2508,6 @@ const ClientDashboard: React.FC = () => {
         }}
         onSuccess={() => {
           // TODO: Refresh invoices from API after successful payment
-          console.log('Payment successful!');
         }}
       />
     </div>

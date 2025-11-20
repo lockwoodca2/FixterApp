@@ -1256,7 +1256,6 @@ const AdminDashboard: React.FC = () => {
                 <button
                   onClick={async () => {
                     try {
-                      console.log('Toggling service:', service);
                       const response = await fetch(`${API_BASE_URL}/admin/services/${service.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
@@ -1264,8 +1263,6 @@ const AdminDashboard: React.FC = () => {
                           isActive: !service.active
                         })
                       });
-
-                      console.log('Response status:', response.status);
 
                       if (response.ok) {
                         const updatedServices = services.map(s =>

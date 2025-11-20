@@ -215,8 +215,6 @@ const SearchResults: React.FC = () => {
     // Sort by rating (highest first)
     filtered.sort((a, b) => b.rating - a.rating);
 
-    console.log('FINAL filtered contractors:', filtered.length);
-    console.log('=== APPLY FILTERS END ===');
     setFilteredContractors(filtered);
   }, [contractors, selectedService, selectedCity, licensedAndInsuredOnly, afterHoursOnly, selectedDate]);
 

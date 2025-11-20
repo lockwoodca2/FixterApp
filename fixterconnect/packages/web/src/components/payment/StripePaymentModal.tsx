@@ -83,8 +83,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ invoice, onClose, onSuccess }
       // });
 
       // Simulate successful payment for now
-      console.log('Payment Method Created:', paymentMethod);
-
       // Show success and close modal
       alert(`Payment of $${invoice.amount} processed successfully!\n\nThis is test mode. In production, the payment would be processed through Stripe.`);
       setIsProcessing(false);
