@@ -101,7 +101,7 @@ const ClientDashboard: React.FC = () => {
 
         // Upcoming are confirmed future bookings (not quotes)
         const upcoming = bookingsData.bookings.filter((b: any) =>
-          new Date(b.scheduledDate) >= now &&
+          parseScheduledDate(b.scheduledDate) >= now &&
           b.status !== 'COMPLETED' &&
           b.status !== 'CANCELLED' &&
           !(b.status === 'PENDING' && b.price !== null) // Exclude quotes
@@ -109,7 +109,7 @@ const ClientDashboard: React.FC = () => {
 
         // History includes completed and past bookings
         const history = bookingsData.bookings.filter((b: any) =>
-          new Date(b.scheduledDate) < now ||
+          parseScheduledDate(b.scheduledDate) < now ||
           b.status === 'COMPLETED' ||
           b.status === 'CANCELLED'
         ).map(transformBooking);
@@ -165,21 +165,34 @@ const ClientDashboard: React.FC = () => {
     }
   };
 
-  const transformBooking = (booking: any) => ({
-    id: booking.id,
-    service: booking.service.name,
-    provider: booking.contractor.name,
-    providerId: booking.contractor.id,
-    date: new Date(booking.scheduledDate).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    }),
-    time: booking.scheduledTime,
-    address: booking.serviceAddress,
-    price: booking.price || 0,
-    status: booking.status,
-    rating: 0, // Will be from reviews when implemented
-    paymentStatus: booking.paymentReceived ? 'paid' : 'pending'
-  });
+  // Helper to parse date without timezone shift
+  const parseScheduledDate = (scheduledDate: any): Date => {
+    const dateStr = typeof scheduledDate === 'string'
+      ? scheduledDate.split('T')[0]
+      : scheduledDate;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const transformBooking = (booking: any) => {
+    const date = parseScheduledDate(booking.scheduledDate);
+
+    return {
+      id: booking.id,
+      service: booking.service.name,
+      provider: booking.contractor.name,
+      providerId: booking.contractor.id,
+      date: date.toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      }),
+      time: booking.scheduledTime,
+      address: booking.serviceAddress,
+      price: booking.price || 0,
+      status: booking.status,
+      rating: 0, // Will be from reviews when implemented
+      paymentStatus: booking.paymentReceived ? 'paid' : 'pending'
+    };
+  };
 
   const formatTimestamp = (dateString: string) => {
     const date = new Date(dateString);
