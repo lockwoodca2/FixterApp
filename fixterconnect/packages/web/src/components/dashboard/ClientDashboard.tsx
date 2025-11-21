@@ -174,6 +174,28 @@ const ClientDashboard: React.FC = () => {
     return new Date(year, month - 1, day);
   };
 
+  // Helper to format time to 12-hour format
+  const formatTo12Hour = (time24: string) => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Format scheduled time (handles both single time and time range)
+  const formatScheduledTime = (scheduledTime: string) => {
+    if (!scheduledTime) return '';
+
+    // Check if it's a time range (e.g., "13:00 - 14:30")
+    if (scheduledTime.includes(' - ')) {
+      const [start, end] = scheduledTime.split(' - ');
+      return `${formatTo12Hour(start)} - ${formatTo12Hour(end)}`;
+    }
+
+    // Single time
+    return formatTo12Hour(scheduledTime);
+  };
+
   const transformBooking = (booking: any) => {
     const date = parseScheduledDate(booking.scheduledDate);
 
@@ -185,7 +207,7 @@ const ClientDashboard: React.FC = () => {
       date: date.toLocaleDateString('en-US', {
         year: 'numeric', month: 'long', day: 'numeric'
       }),
-      time: booking.scheduledTime,
+      time: formatScheduledTime(booking.scheduledTime),
       address: booking.serviceAddress,
       price: booking.price || 0,
       status: booking.status,

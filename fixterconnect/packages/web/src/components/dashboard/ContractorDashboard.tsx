@@ -643,6 +643,20 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  // Format scheduled time (handles both single time and time range)
+  const formatScheduledTime = (scheduledTime: string) => {
+    if (!scheduledTime) return '';
+
+    // Check if it's a time range (e.g., "13:00 - 14:30")
+    if (scheduledTime.includes(' - ')) {
+      const [start, end] = scheduledTime.split(' - ');
+      return `${formatTo12Hour(start)} - ${formatTo12Hour(end)}`;
+    }
+
+    // Single time
+    return formatTo12Hour(scheduledTime);
+  };
+
   const calculateEndTime = (startTime: string, durationMin: string) => {
     // Simple time calculation helper
     const [hours, minutes] = startTime.split(':').map(Number);
@@ -805,7 +819,7 @@ const ContractorDashboard: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '15px', marginBottom: '12px' }}>
                     <span>{job.service.name}</span>
                     <span>•</span>
-                    <span>{job.scheduledTime}</span>
+                    <span>{formatScheduledTime(job.scheduledTime)}</span>
                     <span style={{ marginLeft: '4px' }}>({job.duration || '90 min'})</span>
                     <Edit2
                       size={16}
@@ -1471,7 +1485,7 @@ const ContractorDashboard: React.FC = () => {
                           {new Date(booking.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {booking.client?.firstName} {booking.client?.lastName}
                         </p>
                         <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-                          {booking.service?.name} ({booking.scheduledTime})
+                          {booking.service?.name} ({formatScheduledTime(booking.scheduledTime)})
                         </p>
                       </div>
                       <span style={{
@@ -1536,7 +1550,7 @@ const ContractorDashboard: React.FC = () => {
                             {job.client?.firstName} {job.client?.lastName}
                           </h3>
                           <p style={{ color: '#4f46e5', fontSize: '14px', fontWeight: '600', margin: 0 }}>
-                            {job.service?.name} • {job.scheduledTime} ({job.duration || '90 min'})
+                            {job.service?.name} • {formatScheduledTime(job.scheduledTime)} ({job.duration || '90 min'})
                           </p>
                         </div>
                       </div>
@@ -4277,7 +4291,7 @@ const ContractorDashboard: React.FC = () => {
                   color: '#1e40af',
                   margin: 0
                 }}>
-                  <strong>Note:</strong> The first job time ({(activeSection === 'calendar' ? selectedDateJobs[0] : todaysJobs[0])?.scheduledTime?.split(' - ')[0]}) remains unchanged. Subsequent jobs are automatically scheduled with 15 minutes travel time between appointments.
+                  <strong>Note:</strong> The first job time ({formatTo12Hour((activeSection === 'calendar' ? selectedDateJobs[0] : todaysJobs[0])?.scheduledTime?.split(' - ')[0])}) remains unchanged. Subsequent jobs are automatically scheduled with 15 minutes travel time between appointments.
                 </p>
               </div>
             )}
