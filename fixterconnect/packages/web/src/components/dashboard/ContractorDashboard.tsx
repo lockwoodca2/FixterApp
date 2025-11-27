@@ -3963,8 +3963,11 @@ const ContractorDashboard: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         position: 'fixed',
+        top: 0,
+        left: 0,
         height: '100vh',
-        overflowY: 'auto'
+        overflowY: 'auto',
+        zIndex: 100
       }}>
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
