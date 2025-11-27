@@ -178,7 +178,9 @@ const ContractorDashboard: React.FC = () => {
       setLoading(true);
 
       // Fetch today's jobs (bookings for today)
-      const today = new Date().toISOString().split('T')[0];
+      // Use local date to avoid timezone issues
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const todayJobsResponse = await fetch(`${API_BASE_URL}/bookings/contractor/${user.id}?date=${today}`);
       const todayJobsData = await todayJobsResponse.json();
       if (todayJobsData.success) {
