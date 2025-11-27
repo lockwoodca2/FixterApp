@@ -3963,9 +3963,9 @@ const ContractorDashboard: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         position: 'fixed',
-        top: 0,
+        top: '85px',
         left: 0,
-        height: '100vh',
+        height: 'calc(100vh - 85px)',
         overflowY: 'auto',
         zIndex: 100
       }}>
@@ -4031,32 +4031,6 @@ const ContractorDashboard: React.FC = () => {
           })}
         </nav>
 
-        {/* Logout Button */}
-        <button
-          onClick={() => {
-            logout();
-            window.location.href = '/';
-          }}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            backgroundColor: 'transparent',
-            color: '#ef4444',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            marginTop: '16px'
-          }}
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
       </div>
 
       {/* Main Content */}

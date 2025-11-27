@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { BREAKPOINTS } from '../../constants/breakpoints';
+import { LogOut } from 'react-feather';
 
 const DashboardHeader: React.FC = () => {
   const { user, logout } = useAuth();
@@ -71,18 +72,22 @@ const DashboardHeader: React.FC = () => {
               <button
                 onClick={handleLogout}
                 style={{
-                  background: '#dc2626',
-                  border: 'none',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #e2e8f0',
                   cursor: 'pointer',
-                  color: 'white',
+                  color: '#ef4444',
                   padding: isMobile ? '6px 12px' : '8px 16px',
-                  borderRadius: '6px',
-                  fontWeight: 'bold',
+                  borderRadius: '8px',
+                  fontWeight: '600',
                   fontSize: isMobile ? '13px' : '14px',
                   minHeight: '44px',
-                  minWidth: isMobile ? '70px' : 'auto'
+                  minWidth: isMobile ? '70px' : 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
                 }}
               >
+                <LogOut size={16} />
                 Logout
               </button>
             </li>
