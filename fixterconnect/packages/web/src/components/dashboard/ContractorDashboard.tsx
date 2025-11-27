@@ -68,6 +68,21 @@ const ContractorDashboard: React.FC = () => {
   });
   const serviceAreasList = ['Boise', 'Meridian', 'Nampa', 'Caldwell', 'Eagle', 'Kuna', 'Star', 'Garden City'];
 
+  // Add Job modal states
+  const [showAddJobModal, setShowAddJobModal] = useState(false);
+  const [addJobForm, setAddJobForm] = useState<any>({
+    clientName: '',
+    clientEmail: '',
+    clientPhone: '',
+    service: '',
+    address: '',
+    scheduledDate: '',
+    scheduledTime: '',
+    duration: '90',
+    price: '',
+    notes: ''
+  });
+
   // Date Override states
   const [dateOverrides, setDateOverrides] = useState<any[]>([]);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -668,6 +683,62 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${endMinutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  const handleAddJob = async () => {
+    try {
+      // Validate required fields
+      if (!addJobForm.clientName || !addJobForm.service || !addJobForm.address || !addJobForm.scheduledDate || !addJobForm.scheduledTime) {
+        alert('Please fill in all required fields: Client Name, Service, Address, Date, and Time');
+        return;
+      }
+
+      // Create a manual booking
+      const response = await fetch(`${API_BASE_URL}/bookings/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user?.id,
+          clientName: addJobForm.clientName,
+          clientEmail: addJobForm.clientEmail,
+          clientPhone: addJobForm.clientPhone,
+          serviceName: addJobForm.service,
+          serviceAddress: addJobForm.address,
+          scheduledDate: addJobForm.scheduledDate,
+          scheduledTime: addJobForm.scheduledTime,
+          estimatedDuration: parseInt(addJobForm.duration),
+          price: addJobForm.price ? parseFloat(addJobForm.price) : null,
+          notes: addJobForm.notes
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Job added successfully!');
+        setShowAddJobModal(false);
+        // Reset form
+        setAddJobForm({
+          clientName: '',
+          clientEmail: '',
+          clientPhone: '',
+          service: '',
+          address: '',
+          scheduledDate: '',
+          scheduledTime: '',
+          duration: '90',
+          price: '',
+          notes: ''
+        });
+        // Refresh data to show the new job
+        fetchContractorData();
+      } else {
+        alert(`Failed to add job: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error adding job:', error);
+      alert('Failed to add job. Please try again.');
+    }
+  };
+
   const menuItems = [
     { id: 'today' as ActiveSection, label: "Today's Jobs", icon: Calendar },
     { id: 'messages' as ActiveSection, label: 'Messages', icon: MessageSquare },
@@ -731,16 +802,18 @@ const ContractorDashboard: React.FC = () => {
           }}>
             REFRESH
           </button>
-          <button style={{
-            padding: '10px 20px',
-            backgroundColor: '#10b981',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}>
+          <button
+            onClick={() => setShowAddJobModal(true)}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>
             + ADD JOB
           </button>
         </div>
@@ -4739,6 +4812,303 @@ const ContractorDashboard: React.FC = () => {
                 }}
               >
                 Flag Message
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Job Modal */}
+      {showAddJobModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            width: '90%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            padding: '32px'
+          }}>
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                Add New Job
+              </h2>
+              <button
+                onClick={() => setShowAddJobModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#64748b'
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Client Name */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Client Name *
+                </label>
+                <input
+                  type="text"
+                  value={addJobForm.clientName}
+                  onChange={(e) => setAddJobForm({ ...addJobForm, clientName: e.target.value })}
+                  placeholder="John Doe"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Client Email */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Client Email
+                </label>
+                <input
+                  type="email"
+                  value={addJobForm.clientEmail}
+                  onChange={(e) => setAddJobForm({ ...addJobForm, clientEmail: e.target.value })}
+                  placeholder="john@example.com"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Client Phone */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Client Phone
+                </label>
+                <input
+                  type="tel"
+                  value={addJobForm.clientPhone}
+                  onChange={(e) => setAddJobForm({ ...addJobForm, clientPhone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Service */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Service *
+                </label>
+                <input
+                  type="text"
+                  value={addJobForm.service}
+                  onChange={(e) => setAddJobForm({ ...addJobForm, service: e.target.value })}
+                  placeholder="Lawn Mowing, Hedge Trimming, etc."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Service Address */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Service Address *
+                </label>
+                <input
+                  type="text"
+                  value={addJobForm.address}
+                  onChange={(e) => setAddJobForm({ ...addJobForm, address: e.target.value })}
+                  placeholder="1234 Main St, Boise, ID"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Date and Time Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={addJobForm.scheduledDate}
+                    onChange={(e) => setAddJobForm({ ...addJobForm, scheduledDate: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                    Time *
+                  </label>
+                  <input
+                    type="time"
+                    value={addJobForm.scheduledTime}
+                    onChange={(e) => setAddJobForm({ ...addJobForm, scheduledTime: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Duration and Price Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                    Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={addJobForm.duration}
+                    onChange={(e) => setAddJobForm({ ...addJobForm, duration: e.target.value })}
+                    placeholder="90"
+                    min="15"
+                    step="15"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                    Price ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={addJobForm.price}
+                    onChange={(e) => setAddJobForm({ ...addJobForm, price: e.target.value })}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Notes
+                </label>
+                <textarea
+                  value={addJobForm.notes}
+                  onChange={(e) => setAddJobForm({ ...addJobForm, notes: e.target.value })}
+                  placeholder="Any special instructions or notes..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowAddJobModal(false)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'white',
+                  color: '#64748b',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddJob}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Add Job
               </button>
             </div>
           </div>

@@ -170,6 +170,141 @@ bookings.post('/bookings', async (c) => {
   }
 });
 
+// POST /api/bookings/manual - Create a manual booking (for contractors)
+bookings.post('/bookings/manual', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const {
+      contractorId,
+      clientName,
+      clientEmail,
+      clientPhone,
+      serviceName,
+      serviceAddress,
+      scheduledDate,
+      scheduledTime,
+      estimatedDuration = 90,
+      price,
+      notes
+    } = await c.req.json();
+
+    // Validate required fields
+    if (!contractorId || !clientName || !serviceName || !serviceAddress || !scheduledDate || !scheduledTime) {
+      return c.json({
+        success: false,
+        error: 'Missing required fields'
+      }, 400);
+    }
+
+    // Parse date without timezone shift
+    const [year, month, day] = scheduledDate.split('-').map(Number);
+    const scheduledDateObj = new Date(year, month - 1, day);
+
+    // For manual bookings, we'll create a simplified client record or use "Manual Entry"
+    // You might want to find/create a client based on email if provided
+    let clientId = null;
+
+    if (clientEmail) {
+      const existingClient = await prisma.client.findFirst({
+        where: { email: clientEmail }
+      });
+      clientId = existingClient?.id;
+    }
+
+    // Find or create a service based on name
+    let service = await prisma.service.findFirst({
+      where: { name: serviceName }
+    });
+
+    if (!service) {
+      // Create a generic service if it doesn't exist
+      service = await prisma.service.create({
+        data: {
+          name: serviceName,
+          icon: 'Briefcase'
+        }
+      });
+    }
+
+    // Create booking with time slots
+    const booking = await prisma.$transaction(async (tx) => {
+      const newBooking = await tx.booking.create({
+        data: {
+          contractorId,
+          clientId,
+          serviceId: service.id,
+          serviceAddress,
+          scheduledDate: scheduledDateObj,
+          scheduledTime,
+          estimatedDuration,
+          price: price || null,
+          status: BookingStatus.CONFIRMED, // Manual bookings are auto-confirmed
+          notes: notes || `Manual booking for ${clientName}${clientEmail ? ` (${clientEmail})` : ''}${clientPhone ? ` - ${clientPhone}` : ''}`
+        },
+        include: {
+          contractor: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          service: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+
+      // Calculate and create time slots
+      const { jobSlots, travelSlots } = calculateJobSlots(scheduledTime, estimatedDuration, true);
+
+      const dateObj = new Date(scheduledDateObj);
+      dateObj.setHours(0, 0, 0, 0);
+
+      const jobSlotRecords = jobSlots.map(slot => ({
+        contractorId,
+        date: dateObj,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        slotType: 'JOB' as const,
+        bookingId: newBooking.id,
+        reason: `Booking #${newBooking.id}`
+      }));
+
+      const travelSlotRecords = travelSlots.map(slot => ({
+        contractorId,
+        date: dateObj,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        slotType: 'TRAVEL' as const,
+        reason: 'Travel time to next job'
+      }));
+
+      const allSlots = [...jobSlotRecords, ...travelSlotRecords];
+
+      await Promise.all(
+        allSlots.map(slot => tx.timeSlot.create({ data: slot }))
+      );
+
+      return newBooking;
+    });
+
+    return c.json({
+      success: true,
+      booking,
+      message: 'Manual booking created successfully'
+    });
+  } catch (error) {
+    console.error('Manual booking error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to create manual booking'
+    }, 500);
+  }
+});
+
 // GET /api/bookings/client/:clientId - Get all bookings for a client
 bookings.get('/bookings/client/:clientId', async (c) => {
   try {
