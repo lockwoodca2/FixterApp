@@ -184,8 +184,7 @@ bookings.post('/bookings/manual', async (c) => {
       scheduledDate,
       scheduledTime,
       estimatedDuration = 90,
-      price,
-      notes
+      price
     } = await c.req.json();
 
     // Validate required fields
@@ -200,15 +199,40 @@ bookings.post('/bookings/manual', async (c) => {
     const [year, month, day] = scheduledDate.split('-').map(Number);
     const scheduledDateObj = new Date(year, month - 1, day);
 
-    // For manual bookings, we'll create a simplified client record or use "Manual Entry"
-    // You might want to find/create a client based on email if provided
-    let clientId = null;
+    // For manual bookings, find or create a client
+    let clientId: number;
+    const nameParts = clientName.split(' ');
+    const firstName = nameParts[0] || clientName;
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const emailToUse = clientEmail || `manual_${Date.now()}@placeholder.local`;
 
-    if (clientEmail) {
-      const existingClient = await prisma.client.findFirst({
-        where: { email: clientEmail }
+    // Check if client exists by email
+    const existingClient = await prisma.client.findFirst({
+      where: { email: emailToUse }
+    });
+
+    if (existingClient) {
+      clientId = existingClient.id;
+    } else {
+      // Create a new user and client for manual entries
+      const newUser = await prisma.user.create({
+        data: {
+          username: emailToUse,
+          password: '', // Manual clients don't have passwords
+          type: 'CLIENT'
+        }
       });
-      clientId = existingClient?.id;
+
+      const newClient = await prisma.client.create({
+        data: {
+          userId: newUser.id,
+          firstName,
+          lastName,
+          email: emailToUse,
+          phone: clientPhone || ''
+        }
+      });
+      clientId = newClient.id;
     }
 
     // Find or create a service based on name
@@ -226,26 +250,34 @@ bookings.post('/bookings/manual', async (c) => {
       });
     }
 
+    const serviceId = service.id;
+
     // Create booking with time slots
     const booking = await prisma.$transaction(async (tx) => {
       const newBooking = await tx.booking.create({
         data: {
           contractorId,
           clientId,
-          serviceId: service.id,
+          serviceId,
           serviceAddress,
           scheduledDate: scheduledDateObj,
           scheduledTime,
           estimatedDuration,
           price: price || null,
-          status: BookingStatus.CONFIRMED, // Manual bookings are auto-confirmed
-          notes: notes || `Manual booking for ${clientName}${clientEmail ? ` (${clientEmail})` : ''}${clientPhone ? ` - ${clientPhone}` : ''}`
+          status: BookingStatus.CONFIRMED // Manual bookings are auto-confirmed
         },
         include: {
           contractor: {
             select: {
               id: true,
               name: true
+            }
+          },
+          client: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
             }
           },
           service: {
@@ -587,7 +619,7 @@ bookings.patch('/bookings/:id/schedule', async (c) => {
     }
 
     // Parse date without timezone shift if provided
-    let scheduledDateObj;
+    let scheduledDateObj: Date | undefined;
     if (scheduledDate) {
       const [year, month, day] = scheduledDate.split('-').map(Number);
       scheduledDateObj = new Date(year, month - 1, day);

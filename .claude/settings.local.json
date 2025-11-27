@@ -4,7 +4,8 @@
       "Bash(npm run seed:*)",
       "Bash(npm run build:*)",
       "Bash(npx prisma migrate:*)",
-      "Bash(npx wrangler deploy:*)"
+      "Bash(npx wrangler deploy:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
