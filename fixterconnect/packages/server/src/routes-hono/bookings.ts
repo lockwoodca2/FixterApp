@@ -816,4 +816,46 @@ bookings.delete('/bookings/:id', async (c) => {
   }
 });
 
+// DELETE /api/bookings/:id/permanent - Permanently delete a booking
+bookings.delete('/bookings/:id/permanent', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { id } = c.req.param();
+
+    // Delete in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete associated time slots
+      await tx.timeSlot.deleteMany({
+        where: {
+          OR: [
+            { bookingId: parseInt(id) },
+            { reason: `Booking #${id}` }
+          ]
+        }
+      });
+
+      // Delete associated completion record if exists
+      await tx.jobCompletion.deleteMany({
+        where: { bookingId: parseInt(id) }
+      });
+
+      // Delete the booking
+      await tx.booking.delete({
+        where: { id: parseInt(id) }
+      });
+    });
+
+    return c.json({
+      success: true,
+      message: 'Booking permanently deleted'
+    });
+  } catch (error) {
+    console.error('Delete booking error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to delete booking'
+    }, 500);
+  }
+});
+
 export default bookings;

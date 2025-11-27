@@ -773,6 +773,36 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
+  const handleDeleteJob = async (jobId: number, jobName: string) => {
+    const confirmed = window.confirm(`Are you sure you want to permanently delete "${jobName}"? This will remove all records and cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${jobId}/permanent`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Job deleted successfully');
+        fetchContractorData();
+      } else {
+        alert(`Failed to delete job: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      alert('Failed to delete job. Please try again.');
+    }
+  };
+
+  // Check if a job's scheduled date is today
+  const isJobToday = (scheduledDate: string) => {
+    const datePart = scheduledDate.split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    return datePart === today;
+  };
+
   const menuItems = [
     { id: 'today' as ActiveSection, label: "Today's Jobs", icon: Calendar },
     { id: 'messages' as ActiveSection, label: 'Messages', icon: MessageSquare },
@@ -953,7 +983,13 @@ const ContractorDashboard: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>📞</span>
-                        <span>{job.client.phone}</span>
+                        {job.client.phone ? (
+                          <a href={`tel:${job.client.phone}`} style={{ color: '#4f46e5', textDecoration: 'none' }}>
+                            {job.client.phone}
+                          </a>
+                        ) : (
+                          <span>N/A</span>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>✉️</span>
@@ -965,33 +1001,20 @@ const ContractorDashboard: React.FC = () => {
 
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
-                  <button style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    textTransform: 'uppercase'
-                  }}>
-                    COMPLETE
-                  </button>
                   <button
-                    onClick={() => window.location.href = `tel:${job.client.phone}`}
+                    disabled={!isJobToday(job.scheduledDate)}
                     style={{
                       padding: '12px 24px',
-                      backgroundColor: '#3b82f6',
+                      backgroundColor: isJobToday(job.scheduledDate) ? '#10b981' : '#9ca3af',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
                       fontSize: '14px',
                       fontWeight: '700',
-                      cursor: 'pointer',
+                      cursor: isJobToday(job.scheduledDate) ? 'pointer' : 'not-allowed',
                       textTransform: 'uppercase'
                     }}>
-                    CALL
+                    COMPLETE
                   </button>
                   <button
                     onClick={() => handleCancelJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
@@ -1288,22 +1311,20 @@ const ContractorDashboard: React.FC = () => {
               <p style={{ color: '#64748b', marginBottom: '12px' }}>
                 <strong>Amount:</strong> ${job.price || 'N/A'}
               </p>
-              {job.status !== 'CANCELLED' && job.status !== 'COMPLETED' && (
-                <button
-                  onClick={() => handleCancelJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}>
-                  Cancel Job
-                </button>
-              )}
+              <button
+                onClick={() => handleDeleteJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}>
+                Delete
+              </button>
             </div>
           ))}
         </div>
@@ -1706,7 +1727,11 @@ const ContractorDashboard: React.FC = () => {
 
                       <div style={{ display: 'flex', gap: '16px' }}>
                         <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
-                          📞 {job.client?.phone || 'N/A'}
+                          📞 {job.client?.phone ? (
+                            <a href={`tel:${job.client.phone}`} style={{ color: '#4f46e5', textDecoration: 'none' }}>
+                              {job.client.phone}
+                            </a>
+                          ) : 'N/A'}
                         </p>
                         <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
                           ✉️ {job.client?.email || 'N/A'}
@@ -1716,29 +1741,19 @@ const ContractorDashboard: React.FC = () => {
 
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
-                      <button style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}>
+                      <button
+                        disabled={!isJobToday(job.scheduledDate)}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: isJobToday(job.scheduledDate) ? '#10b981' : '#9ca3af',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: isJobToday(job.scheduledDate) ? 'pointer' : 'not-allowed'
+                        }}>
                         COMPLETE
-                      </button>
-                      <button style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#3b82f6',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}>
-                        CALL
                       </button>
                       <button
                         onClick={() => {
