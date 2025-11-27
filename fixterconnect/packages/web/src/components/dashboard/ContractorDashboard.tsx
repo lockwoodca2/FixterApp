@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
 import {
@@ -20,10 +20,21 @@ import {
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
 
+type ToastType = 'success' | 'error' | 'info';
+
+interface Toast {
+  id: number;
+  message: string;
+  type: ToastType;
+}
+
 const ContractorDashboard: React.FC = () => {
   const { logout, user } = useAuth();
   const [activeSection, setActiveSection] = useState<ActiveSection>('today');
   const [loading, setLoading] = useState(true);
+
+  // Toast notifications
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Data states
   const [todaysJobs, setTodaysJobs] = useState<any[]>([]);
@@ -143,6 +154,16 @@ const ContractorDashboard: React.FC = () => {
     insured: false,
     afterHoursAvailable: false
   });
+
+  // Toast notification helper
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -404,7 +425,7 @@ const ContractorDashboard: React.FC = () => {
 
           if (!response.ok) {
             console.error('Failed to delete booking');
-            alert('Failed to delete job. Please try again.');
+            showToast('Failed to delete job. Please try again.', 'error');
             setShowScheduleChanges(false);
             setPendingReorder(null);
             setAffectedAppointments([]);
@@ -420,10 +441,10 @@ const ContractorDashboard: React.FC = () => {
 
           setEditingJobId(null);
           setEditFormData({});
-          alert('Job deleted successfully');
+          showToast('Job deleted successfully', 'success');
         } catch (error) {
           console.error('Error deleting job:', error);
-          alert('Failed to delete job. Please try again.');
+          showToast('Failed to delete job. Please try again.', 'error');
         }
       } else {
         // Handle time change - update via API
@@ -698,7 +719,7 @@ const ContractorDashboard: React.FC = () => {
     try {
       // Validate required fields
       if (!addJobForm.clientName || !addJobForm.service || !addJobForm.address || !addJobForm.scheduledDate || !addJobForm.scheduledTime) {
-        alert('Please fill in all required fields: Client Name, Service, Address, Date, and Time');
+        showToast('Please fill in all required fields', 'error');
         return;
       }
 
@@ -724,7 +745,7 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Job added successfully!');
+        showToast('Job added successfully!', 'success');
         setShowAddJobModal(false);
         // Reset form
         setAddJobForm({
@@ -742,16 +763,16 @@ const ContractorDashboard: React.FC = () => {
         // Refresh data to show the new job
         fetchContractorData();
       } else {
-        alert(`Failed to add job: ${data.error}`);
+        showToast(data.error || 'Failed to add job', 'error');
       }
     } catch (error) {
       console.error('Error adding job:', error);
-      alert('Failed to add job. Please try again.');
+      showToast('Failed to add job. Please try again.', 'error');
     }
   };
 
   const handleCancelJob = async (jobId: number, jobName: string) => {
-    const confirmed = window.confirm(`Are you sure you want to cancel "${jobName}"? This action cannot be undone.`);
+    const confirmed = window.confirm(`Are you sure you want to cancel "${jobName}"?`);
     if (!confirmed) return;
 
     try {
@@ -762,19 +783,19 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Job cancelled successfully');
+        showToast('Job cancelled successfully', 'success');
         fetchContractorData();
       } else {
-        alert(`Failed to cancel job: ${data.error}`);
+        showToast(data.error || 'Failed to cancel job', 'error');
       }
     } catch (error) {
       console.error('Error cancelling job:', error);
-      alert('Failed to cancel job. Please try again.');
+      showToast('Failed to cancel job. Please try again.', 'error');
     }
   };
 
   const handleDeleteJob = async (jobId: number, jobName: string) => {
-    const confirmed = window.confirm(`Are you sure you want to permanently delete "${jobName}"? This will remove all records and cannot be undone.`);
+    const confirmed = window.confirm(`Are you sure you want to permanently delete "${jobName}"?`);
     if (!confirmed) return;
 
     try {
@@ -785,14 +806,14 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Job deleted successfully');
+        showToast('Job deleted successfully', 'success');
         fetchContractorData();
       } else {
-        alert(`Failed to delete job: ${data.error}`);
+        showToast(data.error || 'Failed to delete job', 'error');
       }
     } catch (error) {
       console.error('Error deleting job:', error);
-      alert('Failed to delete job. Please try again.');
+      showToast('Failed to delete job. Please try again.', 'error');
     }
   };
 
@@ -1127,7 +1148,7 @@ const ContractorDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message. Please try again.');
+      showToast('Failed to send message', 'error');
     }
   };
 
@@ -1138,7 +1159,7 @@ const ContractorDashboard: React.FC = () => {
 
   const handleSubmitFlag = async () => {
     if (!flagReason || !messageToFlag || !user) {
-      alert('Please select a reason for flagging this message.');
+      showToast('Please select a reason for flagging', 'error');
       return;
     }
 
@@ -1162,17 +1183,17 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        alert('Message flagged successfully. Our admin team will review it.');
+        showToast('Message flagged for review', 'success');
         setShowFlagModal(false);
         setMessageToFlag(null);
         setFlagReason('');
         setFlagDetails('');
       } else {
-        alert('Failed to flag message. Please try again.');
+        showToast('Failed to flag message', 'error');
       }
     } catch (error) {
       console.error('Error flagging message:', error);
-      alert('Failed to flag message. Please try again.');
+      showToast('Failed to flag message', 'error');
     }
   };
 
@@ -2145,13 +2166,13 @@ const ContractorDashboard: React.FC = () => {
                       const result = await response.json();
 
                       if (result.success) {
-                        alert(`Schedule saved successfully!\n${result.scheduleCount} days configured\n${result.serviceAreasCount} service areas saved`);
+                        showToast('Schedule saved successfully!', 'success');
                       } else {
-                        alert(`Failed to save schedule: ${result.error}`);
+                        showToast(result.error || 'Failed to save schedule', 'error');
                       }
                     } catch (error) {
                       console.error('Error saving schedule:', error);
-                      alert('Failed to save schedule. Please try again.');
+                      showToast('Failed to save schedule', 'error');
                     }
                   }}
                   style={{
@@ -2312,11 +2333,11 @@ const ContractorDashboard: React.FC = () => {
                                           setDateOverrides(overridesData.overrides || []);
                                         }
 
-                                        alert('Override deleted successfully!');
+                                        showToast('Override deleted', 'success');
                                       }
                                     } catch (error) {
                                       console.error('Error deleting override:', error);
-                                      alert('Failed to delete override');
+                                      showToast('Failed to delete override', 'error');
                                     }
                                   }
                                 }}
@@ -2807,16 +2828,16 @@ const ContractorDashboard: React.FC = () => {
                         // Validate dates
                         if (overrideForm.isDateRange) {
                           if (!overrideForm.startDate || !overrideForm.endDate) {
-                            alert('Please select both start and end dates');
+                            showToast('Please select both start and end dates', 'error');
                             return;
                           }
                           if (new Date(overrideForm.endDate) < new Date(overrideForm.startDate)) {
-                            alert('End date must be after start date');
+                            showToast('End date must be after start date', 'error');
                             return;
                           }
                         } else {
                           if (!overrideForm.specificDate) {
-                            alert('Please select a date');
+                            showToast('Please select a date', 'error');
                             return;
                           }
                         }
@@ -2897,7 +2918,7 @@ const ContractorDashboard: React.FC = () => {
                             }
 
                             setShowOverrideModal(false);
-                            alert(`Successfully created overrides for ${successCount} of ${dates.length} days`);
+                            showToast(`Successfully created overrides for ${successCount} of ${dates.length} days`, 'success');
                           } else {
                             // Single date
                             const requestBody = {
@@ -2935,14 +2956,14 @@ const ContractorDashboard: React.FC = () => {
                               }
 
                               setShowOverrideModal(false);
-                              alert(result.message || 'Date override saved successfully!');
+                              showToast(result.message || 'Date override saved successfully!', 'success');
                             } else {
-                              alert(`Failed to save: ${result.error}`);
+                              showToast(`Failed to save: ${result.error}`, 'error');
                             }
                           }
                         } catch (error) {
                           console.error('Error saving override:', error);
-                          alert('Failed to save date override');
+                          showToast('Failed to save date override', 'error');
                         }
                       }}
                       style={{
@@ -3127,11 +3148,11 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
       if (data.success) {
         setProfile(data.contractor);
-        alert('Profile updated successfully!');
+        showToast('Profile updated successfully!', 'success');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Failed to save profile');
+      showToast('Failed to save profile', 'error');
     }
   };
 
@@ -3191,7 +3212,7 @@ const ContractorDashboard: React.FC = () => {
 
   const handleSaveMaterial = async () => {
     if (!user?.id || !materialForm.name || !materialForm.price || !materialForm.unit) {
-      alert('Please fill in all required fields');
+      showToast('Please fill in all required fields', 'error');
       return;
     }
 
@@ -3221,7 +3242,7 @@ const ContractorDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error saving material:', error);
-      alert('Failed to save material');
+      showToast('Failed to save material', 'error');
     }
   };
 
@@ -3239,7 +3260,7 @@ const ContractorDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error deleting material:', error);
-      alert('Failed to delete material');
+      showToast('Failed to delete material', 'error');
     }
   };
 
@@ -3884,6 +3905,55 @@ const ContractorDashboard: React.FC = () => {
       minHeight: '100vh',
       backgroundColor: '#f8fafc'
     }}>
+      {/* Toast Notifications */}
+      <div style={{
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+      }}>
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            style={{
+              padding: '12px 20px',
+              borderRadius: '8px',
+              backgroundColor: toast.type === 'success' ? '#10b981' :
+                              toast.type === 'error' ? '#ef4444' : '#3b82f6',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              minWidth: '250px',
+              animation: 'slideIn 0.3s ease-out'
+            }}
+          >
+            {toast.type === 'success' && <CheckCircle size={18} />}
+            {toast.type === 'error' && <AlertTriangle size={18} />}
+            {toast.type === 'info' && <MessageSquare size={18} />}
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer',
+                padding: '0',
+                display: 'flex'
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* Sidebar */}
       <div style={{
         width: '280px',
