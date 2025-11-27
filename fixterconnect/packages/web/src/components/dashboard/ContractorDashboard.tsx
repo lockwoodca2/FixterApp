@@ -682,6 +682,11 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  // Get local date string in YYYY-MM-DD format (avoids UTC conversion)
+  const getLocalDateString = (date: Date = new Date()) => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
   // Format date without timezone shift (parse ISO date string as local)
   const formatDateLocal = (dateString: string) => {
     // Extract just the date part (YYYY-MM-DD) from ISO string
@@ -819,10 +824,10 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
-  // Check if a job's scheduled date is today
+  // Check if a job's scheduled date is today (using local timezone)
   const isJobToday = (scheduledDate: string) => {
     const datePart = scheduledDate.split('T')[0];
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     return datePart === today;
   };
 
@@ -1368,13 +1373,17 @@ const ContractorDashboard: React.FC = () => {
         const data = result.bookings || result; // Handle both {bookings: []} and [] formats
 
         // Filter confirmed bookings for current month
-        const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-        const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        const startOfMonthStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        const endOfMonthStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
         const filtered = data.filter((booking: any) => {
           if (booking.status?.toUpperCase() !== 'CONFIRMED') return false;
-          const bookingDate = new Date(booking.scheduledDate);
-          return bookingDate >= startOfMonth && bookingDate <= endOfMonth;
+          // Extract just the date part to avoid timezone issues
+          const bookingDateStr = booking.scheduledDate.split('T')[0];
+          return bookingDateStr >= startOfMonthStr && bookingDateStr <= endOfMonthStr;
         });
 
         setMonthlyBookings(filtered);
@@ -1389,9 +1398,11 @@ const ContractorDashboard: React.FC = () => {
   const renderCalendar = () => {
     // Get bookings count for a specific date
     const getBookingsForDate = (date: Date) => {
+      const dateStr = getLocalDateString(date);
       return monthlyBookings.filter(booking => {
-        const bookingDate = new Date(booking.scheduledDate);
-        return bookingDate.toDateString() === date.toDateString();
+        // Extract just the date part from the ISO string to avoid timezone issues
+        const bookingDateStr = booking.scheduledDate.split('T')[0];
+        return bookingDateStr === dateStr;
       });
     };
 
@@ -1668,7 +1679,7 @@ const ContractorDashboard: React.FC = () => {
                     >
                       <div>
                         <p style={{ fontWeight: '600', color: '#1e293b', margin: '0 0 4px 0' }}>
-                          {new Date(booking.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {booking.client?.firstName} {booking.client?.lastName}
+                          {formatDateLocal(booking.scheduledDate)} - {booking.client?.firstName} {booking.client?.lastName}
                         </p>
                         <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
                           {booking.service?.name} ({formatScheduledTime(booking.scheduledTime)})
@@ -2460,7 +2471,7 @@ const ContractorDashboard: React.FC = () => {
                     // Days of the month
                     for (let day = 1; day <= daysInMonth; day++) {
                       const currentDate = new Date(year, month, day);
-                      const dateString = currentDate.toISOString().split('T')[0];
+                      const dateString = getLocalDateString(currentDate);
                       const dayOfWeek = currentDate.getDay();
                       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
                       const dayName = dayNames[dayOfWeek];
