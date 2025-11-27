@@ -169,9 +169,9 @@ const ContractorDashboard: React.FC = () => {
       const bookingsResponse = await fetch(`${API_BASE_URL}/bookings/contractor/${user.id}`);
       const bookingsData = await bookingsResponse.json();
       if (bookingsData.success) {
-        // Filter for completed/past jobs
-        const history = bookingsData.bookings.filter((b: any) =>
-          b.status === 'COMPLETED' || b.status === 'CANCELLED'
+        // Show all bookings in history, sorted by date (most recent first)
+        const history = bookingsData.bookings.sort((a: any, b: any) =>
+          new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime()
         );
         setJobHistory(history);
 
@@ -1217,8 +1217,12 @@ const ContractorDashboard: React.FC = () => {
                 </h3>
                 <span style={{
                   padding: '4px 12px',
-                  backgroundColor: job.status === 'COMPLETED' ? '#dcfce7' : '#fee2e2',
-                  color: job.status === 'COMPLETED' ? '#166534' : '#991b1b',
+                  backgroundColor: job.status === 'COMPLETED' ? '#dcfce7' :
+                                   job.status === 'CONFIRMED' ? '#dbeafe' :
+                                   job.status === 'PENDING' ? '#fef3c7' : '#fee2e2',
+                  color: job.status === 'COMPLETED' ? '#166534' :
+                         job.status === 'CONFIRMED' ? '#1e40af' :
+                         job.status === 'PENDING' ? '#92400e' : '#991b1b',
                   borderRadius: '6px',
                   fontSize: '12px',
                   fontWeight: '600'

@@ -407,9 +407,10 @@ bookings.get('/bookings/contractor/:contractorId', async (c) => {
     }
 
     if (date) {
-      const targetDate = new Date(date);
-      const nextDay = new Date(targetDate);
-      nextDay.setDate(nextDay.getDate() + 1);
+      // Parse date without timezone shift
+      const [year, month, day] = date.split('-').map(Number);
+      const targetDate = new Date(year, month - 1, day);
+      const nextDay = new Date(year, month - 1, day + 1);
 
       where.scheduledDate = {
         gte: targetDate,
