@@ -14,7 +14,8 @@ import {
   Flag,
   AlertTriangle,
   Edit2,
-  CheckCircle
+  CheckCircle,
+  Trash2
 } from 'react-feather';
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
@@ -749,6 +750,29 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
+  const handleCancelJob = async (jobId: number, jobName: string) => {
+    const confirmed = window.confirm(`Are you sure you want to cancel "${jobName}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${jobId}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Job cancelled successfully');
+        fetchContractorData();
+      } else {
+        alert(`Failed to cancel job: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error cancelling job:', error);
+      alert('Failed to cancel job. Please try again.');
+    }
+  };
+
   const menuItems = [
     { id: 'today' as ActiveSection, label: "Today's Jobs", icon: Calendar },
     { id: 'messages' as ActiveSection, label: 'Messages', icon: MessageSquare },
@@ -968,6 +992,21 @@ const ContractorDashboard: React.FC = () => {
                       textTransform: 'uppercase'
                     }}>
                     CALL
+                  </button>
+                  <button
+                    onClick={() => handleCancelJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      textTransform: 'uppercase'
+                    }}>
+                    CANCEL
                   </button>
                 </div>
               </div>
@@ -1246,9 +1285,25 @@ const ContractorDashboard: React.FC = () => {
               <p style={{ color: '#64748b', marginBottom: '4px' }}>
                 <strong>Date:</strong> {formatDateLocal(job.scheduledDate)}
               </p>
-              <p style={{ color: '#64748b' }}>
+              <p style={{ color: '#64748b', marginBottom: '12px' }}>
                 <strong>Amount:</strong> ${job.price || 'N/A'}
               </p>
+              {job.status !== 'CANCELLED' && job.status !== 'COMPLETED' && (
+                <button
+                  onClick={() => handleCancelJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}>
+                  Cancel Job
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -1684,6 +1739,22 @@ const ContractorDashboard: React.FC = () => {
                         cursor: 'pointer'
                       }}>
                         CALL
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleCancelJob(job.id, `${job.client?.firstName} ${job.client?.lastName} - ${job.service?.name}`);
+                        }}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}>
+                        CANCEL
                       </button>
                     </div>
                   </div>
@@ -2906,25 +2977,42 @@ const ContractorDashboard: React.FC = () => {
                 <strong>Client:</strong> {quote.client.firstName} {quote.client.lastName}
               </p>
               <p style={{ color: '#64748b', marginBottom: '4px' }}>
-                <strong>Date:</strong> {new Date(quote.scheduledDate).toLocaleDateString()}
+                <strong>Date:</strong> {formatDateLocal(quote.scheduledDate)}
               </p>
               <p style={{ color: '#64748b', marginBottom: '16px' }}>
                 <strong>Address:</strong> {quote.serviceAddress}
               </p>
-              <button
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                Send Quote
-              </button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Send Quote
+                </button>
+                <button
+                  onClick={() => handleCancelJob(quote.id, `${quote.client.firstName} ${quote.client.lastName} - ${quote.service.name}`)}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Decline
+                </button>
+              </div>
             </div>
           ))}
         </div>
