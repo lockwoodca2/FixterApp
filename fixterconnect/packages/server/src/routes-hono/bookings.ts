@@ -783,6 +783,26 @@ bookings.delete('/bookings/:id', async (c) => {
     const prisma = c.get('prisma');
     const { id } = c.req.param();
 
+    // Check if booking exists first
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingBooking) {
+      return c.json({
+        success: false,
+        error: 'Booking not found'
+      }, 404);
+    }
+
+    if (existingBooking.status === BookingStatus.CANCELLED) {
+      return c.json({
+        success: true,
+        message: 'Booking is already cancelled',
+        booking: existingBooking
+      });
+    }
+
     // Update booking and delete time slots in a transaction
     const booking = await prisma.$transaction(async (tx) => {
       // Delete associated time slots
@@ -821,6 +841,18 @@ bookings.delete('/bookings/:id/permanent', async (c) => {
   try {
     const prisma = c.get('prisma');
     const { id } = c.req.param();
+
+    // Check if booking exists first
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingBooking) {
+      return c.json({
+        success: false,
+        error: 'Booking not found'
+      }, 404);
+    }
 
     // Delete in a transaction
     await prisma.$transaction(async (tx) => {
