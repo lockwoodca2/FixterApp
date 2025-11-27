@@ -658,6 +658,16 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  // Format date without timezone shift (parse ISO date string as local)
+  const formatDateLocal = (dateString: string) => {
+    // Extract just the date part (YYYY-MM-DD) from ISO string
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    // Create date using local timezone
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   // Format scheduled time (handles both single time and time range)
   const formatScheduledTime = (scheduledTime: string) => {
     if (!scheduledTime) return '';
@@ -1234,7 +1244,7 @@ const ContractorDashboard: React.FC = () => {
                 <strong>Client:</strong> {job.client.firstName} {job.client.lastName}
               </p>
               <p style={{ color: '#64748b', marginBottom: '4px' }}>
-                <strong>Date:</strong> {new Date(job.scheduledDate).toLocaleDateString()}
+                <strong>Date:</strong> {formatDateLocal(job.scheduledDate)}
               </p>
               <p style={{ color: '#64748b' }}>
                 <strong>Amount:</strong> ${job.price || 'N/A'}
