@@ -3642,7 +3642,12 @@ const ContractorDashboard: React.FC = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!user?.id) return;
+    console.log('handleSaveProfile called');
+    console.log('user?.id:', user?.id);
+    if (!user?.id) {
+      console.log('No user ID, returning early');
+      return;
+    }
 
     const payload = {
       name: profileForm.name,
