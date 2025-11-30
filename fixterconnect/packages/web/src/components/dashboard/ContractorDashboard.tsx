@@ -76,6 +76,7 @@ const ContractorDashboard: React.FC = () => {
   // Today's Jobs view mode
   const [todaysJobsViewMode, setTodaysJobsViewMode] = useState<'list' | 'map'>('list');
   const [jobCoordinates, setJobCoordinates] = useState<{[key: number]: {lat: number, lng: number}}>({});
+  const [geocodingComplete, setGeocodingComplete] = useState(false);
 
   // Edit mode states
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
@@ -770,6 +771,7 @@ const ContractorDashboard: React.FC = () => {
   useEffect(() => {
     const geocodeJobs = async () => {
       if (todaysJobsViewMode === 'map' && todaysJobs.length > 0) {
+        setGeocodingComplete(false);
         const newCoords: {[key: number]: {lat: number, lng: number}} = {};
         for (const job of todaysJobs) {
           if (!jobCoordinates[job.id] && job.serviceAddress) {
@@ -784,6 +786,9 @@ const ContractorDashboard: React.FC = () => {
           }
         }
         setJobCoordinates(prev => ({ ...prev, ...newCoords }));
+        setGeocodingComplete(true);
+      } else if (todaysJobsViewMode === 'map' && todaysJobs.length === 0) {
+        setGeocodingComplete(true);
       }
     };
     geocodeJobs();
@@ -1445,9 +1450,9 @@ const ContractorDashboard: React.FC = () => {
             onClick={fetchContractorData}
             style={{
               padding: '10px 20px',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
+              backgroundColor: 'transparent',
+              color: '#64748b',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
               fontSize: '14px',
               fontWeight: '600',
@@ -1486,13 +1491,17 @@ const ContractorDashboard: React.FC = () => {
           {todaysJobs.length > 0 ? (
             <>
               <div style={{ height: '500px', position: 'relative' }}>
-                {Object.keys(jobCoordinates).length > 0 ? (
+                {geocodingComplete ? (
                   <MapContainer
-                    center={[
-                      Object.values(jobCoordinates).reduce((sum, c) => sum + c.lat, 0) / Object.values(jobCoordinates).length,
-                      Object.values(jobCoordinates).reduce((sum, c) => sum + c.lng, 0) / Object.values(jobCoordinates).length
-                    ]}
-                    zoom={11}
+                    center={
+                      Object.keys(jobCoordinates).length > 0
+                        ? [
+                            Object.values(jobCoordinates).reduce((sum, c) => sum + c.lat, 0) / Object.values(jobCoordinates).length,
+                            Object.values(jobCoordinates).reduce((sum, c) => sum + c.lng, 0) / Object.values(jobCoordinates).length
+                          ]
+                        : [43.6150, -116.2023] // Default to Boise, ID if no coordinates found
+                    }
+                    zoom={Object.keys(jobCoordinates).length > 0 ? 11 : 10}
                     style={{ height: '100%', width: '100%' }}
                   >
                     <TileLayer
@@ -1598,24 +1607,43 @@ const ContractorDashboard: React.FC = () => {
                 )}
               </div>
 
+              {/* Warning if some addresses couldn't be geocoded */}
+              {geocodingComplete && Object.keys(jobCoordinates).length < todaysJobs.length && (
+                <div style={{
+                  padding: '12px 20px',
+                  backgroundColor: '#fef3c7',
+                  borderTop: '1px solid #fcd34d',
+                  color: '#92400e',
+                  fontSize: '14px'
+                }}>
+                  <strong>Note:</strong> {todaysJobs.length - Object.keys(jobCoordinates).length} job address(es) couldn't be found on the map. Please verify the addresses are correct.
+                </div>
+              )}
+
               {/* Route Summary */}
               <div style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 'bold', color: '#1e293b' }}>
-                  Today's Route ({todaysJobs.length} jobs):
+                  Today's Route ({todaysJobs.length} jobs): <span style={{ fontWeight: 'normal', color: '#64748b', fontSize: '13px' }}>Drag to reorder</span>
                 </h4>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {todaysJobs.map((job, index) => (
                     <div
                       key={job.id}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
                         padding: '6px 12px',
-                        backgroundColor: 'white',
+                        backgroundColor: draggedIndex === index ? '#e0e7ff' : 'white',
                         borderRadius: '20px',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '13px'
+                        border: draggedIndex === index ? '1px solid #818cf8' : '1px solid #e2e8f0',
+                        fontSize: '13px',
+                        cursor: 'grab',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       <span style={{
