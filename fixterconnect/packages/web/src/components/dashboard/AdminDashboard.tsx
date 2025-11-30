@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../../config/api';
 import {
   Users,
@@ -138,6 +138,18 @@ const AdminDashboard: React.FC = () => {
   const [showAddLanguageModal, setShowAddLanguageModal] = useState(false);
   const [editingLanguage, setEditingLanguage] = useState<Language | null>(null);
   const [languageForm, setLanguageForm] = useState({ name: '', code: '', flag: '' });
+
+  // Toast notifications
+  type ToastType = 'success' | 'error' | 'info';
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: ToastType }>>([]);
+
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  }, []);
 
   // Fetch admin data when authenticated
   useEffect(() => {
@@ -627,13 +639,13 @@ const AdminDashboard: React.FC = () => {
                               const data = await response.json();
                               if (data.success) {
                                 setUsers(users.filter(u => u.id !== user.id));
-                                alert('User deleted successfully');
+                                showToast('User deleted successfully', 'success');
                               } else {
-                                alert(data.error || 'Failed to delete user');
+                                showToast(data.error || 'Failed to delete user', 'error');
                               }
                             } catch (error) {
                               console.error('Delete user error:', error);
-                              alert('Failed to delete user');
+                              showToast('Failed to delete user', 'error');
                             }
                           }
                         }}
@@ -2983,6 +2995,36 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div style={{
+        position: 'fixed',
+        top: '24px',
+        right: '24px',
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+      }}>
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            style={{
+              padding: '16px 24px',
+              backgroundColor: toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : '#3b82f6',
+              color: 'white',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              animation: 'slideIn 0.3s ease-out'
+            }}
+          >
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>{toast.message}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
