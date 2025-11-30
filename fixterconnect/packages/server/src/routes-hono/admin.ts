@@ -152,6 +152,52 @@ admin.get('/admin/flagged-messages', async (c) => {
   }
 });
 
+// Create service
+admin.post('/admin/services', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { name, description, icon } = await c.req.json();
+
+    if (!name) {
+      return c.json({
+        success: false,
+        error: 'Service name is required'
+      }, 400);
+    }
+
+    // Check if service already exists
+    const existing = await prisma.service.findUnique({
+      where: { name }
+    });
+
+    if (existing) {
+      return c.json({
+        success: false,
+        error: 'Service already exists'
+      }, 400);
+    }
+
+    const service = await prisma.service.create({
+      data: {
+        name,
+        description: description || null,
+        icon: icon || 'tool' // default icon
+      }
+    });
+
+    return c.json({
+      success: true,
+      service
+    }, 201);
+  } catch (error) {
+    console.error('Error creating service:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to create service'
+    }, 500);
+  }
+});
+
 // Update service
 admin.put('/admin/services/:id', async (c) => {
   try {

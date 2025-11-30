@@ -1105,7 +1105,7 @@ const AdminDashboard: React.FC = () => {
     const handleSaveService = async () => {
       try {
         if (!serviceForm.name.trim()) {
-          alert('Please enter a service name');
+          showToast('Please enter a service name', 'error');
           return;
         }
 
@@ -1120,22 +1120,49 @@ const AdminDashboard: React.FC = () => {
             })
           });
 
-          if (response.ok) {
-            const data = await response.json();
+          const data = await response.json();
+          if (data.success) {
             setServices(services.map(s =>
               s.id === editingService.id ? { ...s, name: data.service.name, description: data.service.description } : s
             ));
             setShowAddServiceModal(false);
             setEditingService(null);
             setServiceForm({ name: '', description: '' });
+            showToast('Service updated successfully', 'success');
           } else {
-            const error = await response.json();
-            alert(error.error || 'Failed to update service');
+            showToast(data.error || 'Failed to update service', 'error');
+          }
+        } else {
+          // Create new service
+          const response = await fetch(`${API_BASE_URL}/admin/services`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: serviceForm.name,
+              description: serviceForm.description
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            setServices([...services, {
+              id: data.service.id,
+              name: data.service.name,
+              description: data.service.description || '',
+              category: 'General',
+              active: true,
+              contractorCount: 0
+            }]);
+            setShowAddServiceModal(false);
+            setServiceForm({ name: '', description: '' });
+            showToast('Service created successfully', 'success');
+          } else {
+            showToast(data.error || 'Failed to create service', 'error');
           }
         }
       } catch (error) {
         console.error('Save service error:', error);
-        alert('Failed to save service');
+        showToast('Failed to save service', 'error');
       }
     };
 
@@ -1422,7 +1449,7 @@ const AdminDashboard: React.FC = () => {
               color: '#1e293b',
               marginBottom: '24px'
             }}>
-              Edit Service
+              {editingService ? 'Edit Service' : 'Add Service'}
             </h3>
 
             <div style={{ marginBottom: '20px' }}>
@@ -1511,7 +1538,7 @@ const AdminDashboard: React.FC = () => {
                   cursor: 'pointer'
                 }}
               >
-                UPDATE SERVICE
+                {editingService ? 'UPDATE SERVICE' : 'ADD SERVICE'}
               </button>
             </div>
           </div>
