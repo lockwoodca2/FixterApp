@@ -18,6 +18,11 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
 
+// Helper to get local date string in YYYY-MM-DD format (avoids UTC conversion)
+const getLocalDateString = (date: Date = new Date()) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 const ContractorDetails: React.FC = () => {
   const { contractorId } = useParams<{ contractorId: string }>();
   const navigate = useNavigate();
@@ -55,8 +60,10 @@ const ContractorDetails: React.FC = () => {
         setContractor(data.contractor);
 
         // Load availability for next 30 days
-        const startDate = new Date().toISOString().split('T')[0];
-        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const startDate = getLocalDateString();
+        const endDateObj = new Date();
+        endDateObj.setDate(endDateObj.getDate() + 30);
+        const endDate = getLocalDateString(endDateObj);
 
         const availResponse = await fetch(
           `${API_BASE_URL}/availability/contractor/${contractorId}/range?startDate=${startDate}&endDate=${endDate}`
@@ -103,7 +110,7 @@ const ContractorDetails: React.FC = () => {
     // The API returns dates as ISO strings, so we need to normalize for comparison
     const availEntry = availabilityData.find(
       (a: any) => {
-        const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : new Date(a.date).toISOString().split('T')[0];
+        const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : a.date;
         return apiDate === date && a.isAvailable && a.availableSlots > 0;
       }
     );
@@ -281,7 +288,7 @@ const ContractorDetails: React.FC = () => {
   const isDateAvailable = (dateString: string) => {
     const availEntry = availabilityData.find(
       (a: any) => {
-        const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : new Date(a.date).toISOString().split('T')[0];
+        const apiDate = typeof a.date === 'string' ? a.date.split('T')[0] : a.date;
         const matches = apiDate === dateString && a.isAvailable && a.availableSlots > 0;
         return matches;
       }
@@ -461,7 +468,7 @@ const ContractorDetails: React.FC = () => {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+              min={getLocalDateString()}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -1215,7 +1222,7 @@ const ContractorDetails: React.FC = () => {
                       return <div key={`empty-${index}`} />;
                     }
 
-                    const isToday = day.date === new Date().toISOString().split('T')[0];
+                    const isToday = day.date === getLocalDateString();
 
                   return (
                     <div
