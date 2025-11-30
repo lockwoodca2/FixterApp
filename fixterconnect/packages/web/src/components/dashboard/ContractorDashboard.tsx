@@ -15,8 +15,13 @@ import {
   AlertTriangle,
   Edit2,
   CheckCircle,
-  Trash2
+  Trash2,
+  Phone,
+  Navigation
 } from 'react-feather';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
 
@@ -27,6 +32,30 @@ interface Toast {
   message: string;
   type: ToastType;
 }
+
+// Create numbered marker icon for map
+const createNumberedIcon = (number: number) => {
+  return L.divIcon({
+    className: 'custom-numbered-marker',
+    html: `<div style="
+      background-color: #3b82f6;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      border: 3px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    ">${number}</div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
+  });
+};
 
 const ContractorDashboard: React.FC = () => {
   const { logout, user } = useAuth();
@@ -43,6 +72,10 @@ const ContractorDashboard: React.FC = () => {
   const [jobHistory, setJobHistory] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
+
+  // Today's Jobs view mode
+  const [todaysJobsViewMode, setTodaysJobsViewMode] = useState<'list' | 'map'>('list');
+  const [jobCoordinates, setJobCoordinates] = useState<{[key: number]: {lat: number, lng: number}}>({});
 
   // Edit mode states
   const [editingJobId, setEditingJobId] = useState<number | null>(null);
@@ -715,6 +748,47 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${endMinutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  // Geocode address to coordinates using OpenStreetMap Nominatim
+  const geocodeAddress = async (address: string): Promise<{lat: number, lng: number} | null> => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+        { headers: { 'User-Agent': 'FixterConnect/1.0' } }
+      );
+      const data = await response.json();
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+      return null;
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return null;
+    }
+  };
+
+  // Geocode all jobs when switching to map view
+  useEffect(() => {
+    const geocodeJobs = async () => {
+      if (todaysJobsViewMode === 'map' && todaysJobs.length > 0) {
+        const newCoords: {[key: number]: {lat: number, lng: number}} = {};
+        for (const job of todaysJobs) {
+          if (!jobCoordinates[job.id] && job.serviceAddress) {
+            const coords = await geocodeAddress(job.serviceAddress);
+            if (coords) {
+              newCoords[job.id] = coords;
+            }
+            // Rate limit to avoid hitting Nominatim too fast
+            await new Promise(resolve => setTimeout(resolve, 300));
+          } else if (jobCoordinates[job.id]) {
+            newCoords[job.id] = jobCoordinates[job.id];
+          }
+        }
+        setJobCoordinates(prev => ({ ...prev, ...newCoords }));
+      }
+    };
+    geocodeJobs();
+  }, [todaysJobsViewMode, todaysJobs]);
+
   // Resize image to max 800px width
   const resizeImage = (file: File, maxWidth: number = 800): Promise<File> => {
     return new Promise((resolve, reject) => {
@@ -1339,42 +1413,46 @@ const ContractorDashboard: React.FC = () => {
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{
-            padding: '10px 20px',
-            backgroundColor: 'transparent',
-            color: '#64748b',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}>
+          <button
+            onClick={() => setTodaysJobsViewMode('list')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: todaysJobsViewMode === 'list' ? '#f1f5f9' : 'transparent',
+              color: todaysJobsViewMode === 'list' ? '#1e293b' : '#64748b',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>
             LIST VIEW
           </button>
-          <button style={{
-            padding: '10px 20px',
-            backgroundColor: 'transparent',
-            color: '#64748b',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}>
+          <button
+            onClick={() => setTodaysJobsViewMode('map')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: todaysJobsViewMode === 'map' ? '#3b82f6' : 'transparent',
+              color: todaysJobsViewMode === 'map' ? 'white' : '#64748b',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>
             MAP VIEW
           </button>
           <button
             onClick={fetchContractorData}
             style={{
-            padding: '10px 20px',
-            backgroundColor: 'transparent',
-            color: '#64748b',
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}>
+              padding: '10px 20px',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}>
             REFRESH
           </button>
           <button
@@ -1394,10 +1472,182 @@ const ContractorDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Jobs List */}
+      {/* Jobs Content - List or Map View */}
       {loading ? (
         <p style={{ color: '#64748b' }}>Loading...</p>
+      ) : todaysJobsViewMode === 'map' ? (
+        /* Map View */
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Today's Jobs - Map View</h3>
+            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '4px', marginBottom: 0 }}>Click on markers to view job details and get directions</p>
+          </div>
+
+          {todaysJobs.length > 0 ? (
+            <>
+              <div style={{ height: '500px', position: 'relative' }}>
+                {Object.keys(jobCoordinates).length > 0 ? (
+                  <MapContainer
+                    center={[
+                      Object.values(jobCoordinates).reduce((sum, c) => sum + c.lat, 0) / Object.values(jobCoordinates).length,
+                      Object.values(jobCoordinates).reduce((sum, c) => sum + c.lng, 0) / Object.values(jobCoordinates).length
+                    ]}
+                    zoom={11}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {todaysJobs.map((job, index) => {
+                      const coords = jobCoordinates[job.id];
+                      if (!coords) return null;
+                      return (
+                        <Marker
+                          key={job.id}
+                          position={[coords.lat, coords.lng]}
+                          icon={createNumberedIcon(index + 1)}
+                        >
+                          <Popup>
+                            <div style={{ minWidth: '250px' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 'bold' }}>
+                                Job #{index + 1}: {job.client.firstName} {job.client.lastName}
+                              </h4>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>
+                                <strong>Service:</strong> {job.service.name}
+                              </p>
+                              <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>
+                                <strong>Time:</strong> {formatScheduledTime(job.scheduledTime)}
+                              </p>
+                              {job.client.phone && (
+                                <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>
+                                  <strong>Phone:</strong> {job.client.phone}
+                                </p>
+                              )}
+                              <p style={{ margin: '0 0 12px 0', fontSize: '14px' }}>
+                                <a
+                                  href={`https://maps.google.com/?q=${encodeURIComponent(job.serviceAddress)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: '#3b82f6', textDecoration: 'none' }}
+                                >
+                                  <MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} />
+                                  <strong>Address:</strong> {job.serviceAddress}
+                                </a>
+                              </p>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <a
+                                  href={`https://maps.google.com/maps?daddr=${encodeURIComponent(job.serviceAddress)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    backgroundColor: '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    fontWeight: '600',
+                                    textAlign: 'center',
+                                    textDecoration: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Navigation size={14} />
+                                  GET DIRECTIONS
+                                </a>
+                                {job.client.phone && (
+                                  <a
+                                    href={`tel:${job.client.phone}`}
+                                    style={{
+                                      flex: 1,
+                                      padding: '8px 12px',
+                                      backgroundColor: '#3b82f6',
+                                      color: 'white',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      fontSize: '13px',
+                                      fontWeight: '600',
+                                      textAlign: 'center',
+                                      textDecoration: 'none',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    <Phone size={14} />
+                                    CALL
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+                  </MapContainer>
+                ) : (
+                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                    Loading map coordinates...
+                  </div>
+                )}
+              </div>
+
+              {/* Route Summary */}
+              <div style={{ padding: '16px 20px', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 'bold', color: '#1e293b' }}>
+                  Today's Route ({todaysJobs.length} jobs):
+                </h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {todaysJobs.map((job, index) => (
+                    <div
+                      key={job.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        backgroundColor: 'white',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <span style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: '#3b82f6',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 'bold'
+                      }}>
+                        {index + 1}
+                      </span>
+                      <span style={{ color: '#1e293b' }}>{job.client.firstName} {job.client.lastName}</span>
+                      <span style={{ color: '#64748b' }}>- {formatScheduledTime(job.scheduledTime)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ padding: '48px', textAlign: 'center' }}>
+              <Calendar size={48} color="#cbd5e1" style={{ margin: '0 auto 16px' }} />
+              <p style={{ color: '#94a3b8', fontSize: '16px' }}>No jobs scheduled for today</p>
+            </div>
+          )}
+        </div>
       ) : todaysJobs.length > 0 ? (
+        /* List View */
         <div style={{ display: 'grid', gap: '20px' }}>
           {todaysJobs.map((job, index) => (
               <div
@@ -5351,10 +5601,10 @@ const ContractorDashboard: React.FC = () => {
             <div style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '20px',
+              padding: '16px 20px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '8px'
             }}>
               {selectedConversation.messages && selectedConversation.messages.length > 0 ? (
                 selectedConversation.messages.map((msg: any, index: number) => (
@@ -5363,7 +5613,7 @@ const ContractorDashboard: React.FC = () => {
                     style={{
                       display: 'flex',
                       justifyContent: msg.sender === 'contractor' ? 'flex-end' : 'flex-start',
-                      gap: '8px',
+                      gap: '6px',
                       alignItems: 'flex-start'
                     }}
                   >
@@ -5375,25 +5625,27 @@ const ContractorDashboard: React.FC = () => {
                           border: 'none',
                           cursor: 'pointer',
                           color: '#94a3b8',
-                          padding: '4px',
-                          marginTop: '8px'
+                          padding: '2px',
+                          marginTop: '4px'
                         }}
                         title="Flag message"
                       >
-                        <Flag size={16} />
+                        <Flag size={14} />
                       </button>
                     )}
                     <div style={{
-                      maxWidth: '70%',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
+                      maxWidth: '75%',
+                      padding: '8px 12px',
+                      borderRadius: '16px',
                       backgroundColor: msg.sender === 'contractor' ? '#3b82f6' : '#f1f5f9',
                       color: msg.sender === 'contractor' ? 'white' : '#1e293b'
                     }}>
-                      <p style={{ marginBottom: '4px' }}>{msg.text}</p>
+                      <p style={{ fontSize: '14px', lineHeight: '1.4', margin: 0 }}>{msg.text}</p>
                       <p style={{
-                        fontSize: '12px',
-                        opacity: 0.7
+                        fontSize: '11px',
+                        opacity: 0.6,
+                        marginTop: '2px',
+                        marginBottom: 0
                       }}>
                         {msg.time}
                       </p>
@@ -5401,7 +5653,7 @@ const ContractorDashboard: React.FC = () => {
                   </div>
                 ))
               ) : (
-                <p style={{ textAlign: 'center', color: '#64748b' }}>
+                <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
                   No messages yet. Start the conversation!
                 </p>
               )}
@@ -5409,10 +5661,10 @@ const ContractorDashboard: React.FC = () => {
 
             {/* Input */}
             <div style={{
-              padding: '20px',
+              padding: '12px 16px',
               borderTop: '1px solid #e2e8f0',
               display: 'flex',
-              gap: '12px'
+              gap: '8px'
             }}>
               <input
                 type="text"
@@ -5426,9 +5678,9 @@ const ContractorDashboard: React.FC = () => {
                 placeholder="Type your message..."
                 style={{
                   flex: 1,
-                  padding: '12px 16px',
+                  padding: '10px 14px',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
+                  borderRadius: '20px',
                   fontSize: '14px',
                   outline: 'none'
                 }}
@@ -5437,13 +5689,13 @@ const ContractorDashboard: React.FC = () => {
                 onClick={handleSendMessage}
                 disabled={!messageText.trim()}
                 style={{
-                  padding: '12px 24px',
+                  padding: '10px 20px',
                   backgroundColor: messageText.trim() ? '#3b82f6' : '#cbd5e1',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '20px',
                   fontSize: '14px',
-                  fontWeight: 'bold',
+                  fontWeight: '500',
                   cursor: messageText.trim() ? 'pointer' : 'not-allowed'
                 }}
               >

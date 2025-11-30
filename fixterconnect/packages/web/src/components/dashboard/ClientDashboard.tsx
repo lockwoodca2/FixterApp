@@ -2208,10 +2208,10 @@ const ClientDashboard: React.FC = () => {
             <div style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '20px',
+              padding: '16px 20px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '8px'
             }}>
               {selectedConversation.messages && selectedConversation.messages.length > 0 ? (
                 selectedConversation.messages.map((msg: any, index: number) => (
@@ -2220,7 +2220,7 @@ const ClientDashboard: React.FC = () => {
                     style={{
                       display: 'flex',
                       justifyContent: msg.sender === 'client' ? 'flex-end' : 'flex-start',
-                      gap: '8px',
+                      gap: '6px',
                       alignItems: 'flex-start'
                     }}
                   >
@@ -2232,25 +2232,27 @@ const ClientDashboard: React.FC = () => {
                           border: 'none',
                           cursor: 'pointer',
                           color: '#94a3b8',
-                          padding: '4px',
-                          marginTop: '8px'
+                          padding: '2px',
+                          marginTop: '4px'
                         }}
                         title="Flag message"
                       >
-                        <Flag size={16} />
+                        <Flag size={14} />
                       </button>
                     )}
                     <div style={{
-                      maxWidth: '70%',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
+                      maxWidth: '75%',
+                      padding: '8px 12px',
+                      borderRadius: '16px',
                       backgroundColor: msg.sender === 'client' ? '#3b82f6' : '#f1f5f9',
                       color: msg.sender === 'client' ? 'white' : '#1e293b'
                     }}>
-                      <p style={{ marginBottom: '4px' }}>{msg.text}</p>
+                      <p style={{ fontSize: '14px', lineHeight: '1.4', margin: 0 }}>{msg.text}</p>
                       <p style={{
-                        fontSize: '12px',
-                        opacity: 0.7
+                        fontSize: '11px',
+                        opacity: 0.6,
+                        marginTop: '2px',
+                        marginBottom: 0
                       }}>
                         {msg.time}
                       </p>
@@ -2258,7 +2260,7 @@ const ClientDashboard: React.FC = () => {
                   </div>
                 ))
               ) : (
-                <p style={{ textAlign: 'center', color: '#64748b' }}>
+                <p style={{ textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
                   No messages yet. Start the conversation!
                 </p>
               )}
@@ -2266,10 +2268,10 @@ const ClientDashboard: React.FC = () => {
 
             {/* Input */}
             <div style={{
-              padding: '20px',
+              padding: '12px 16px',
               borderTop: '1px solid #e2e8f0',
               display: 'flex',
-              gap: '12px'
+              gap: '8px'
             }}>
               <input
                 type="text"
@@ -2283,9 +2285,9 @@ const ClientDashboard: React.FC = () => {
                 placeholder="Type your message..."
                 style={{
                   flex: 1,
-                  padding: '12px 16px',
+                  padding: '10px 14px',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
+                  borderRadius: '20px',
                   fontSize: '14px',
                   outline: 'none'
                 }}
@@ -2294,13 +2296,13 @@ const ClientDashboard: React.FC = () => {
                 onClick={handleSendMessage}
                 disabled={!messageText.trim()}
                 style={{
-                  padding: '12px 24px',
+                  padding: '10px 20px',
                   backgroundColor: messageText.trim() ? '#3b82f6' : '#cbd5e1',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
+                  borderRadius: '20px',
                   fontSize: '14px',
-                  fontWeight: 'bold',
+                  fontWeight: '500',
                   cursor: messageText.trim() ? 'pointer' : 'not-allowed'
                 }}
               >
