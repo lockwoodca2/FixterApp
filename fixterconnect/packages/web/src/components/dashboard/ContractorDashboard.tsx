@@ -1513,33 +1513,16 @@ const ContractorDashboard: React.FC = () => {
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', gap: '12px', flexShrink: 0, alignItems: 'center' }}>
                   {job.status === 'COMPLETED' ? (
-                    <>
-                      <span style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#dcfce7',
-                        color: '#166534',
-                        borderRadius: '20px',
-                        fontSize: '13px',
-                        fontWeight: '600'
-                      }}>
-                        Complete
-                      </span>
-                      <button
-                        onClick={() => handleCompleteJob(job)}
-                        style={{
-                          padding: '12px 24px',
-                          backgroundColor: 'white',
-                          color: '#1e293b',
-                          border: '2px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          textTransform: 'uppercase'
-                        }}>
-                        EDIT
-                      </button>
-                    </>
+                    <span style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#dcfce7',
+                      color: '#166534',
+                      borderRadius: '20px',
+                      fontSize: '13px',
+                      fontWeight: '600'
+                    }}>
+                      Complete
+                    </span>
                   ) : (
                     <>
                       <button
