@@ -724,16 +724,29 @@ bookings.patch('/bookings/:id/schedule', async (c) => {
   }
 });
 
-// POST /api/bookings/:id/complete - Mark job as complete with details
+// POST /api/bookings/:id/complete - Mark job as complete with details and generate invoice
 bookings.post('/bookings/:id/complete', async (c) => {
   try {
     const prisma = c.get('prisma');
     const { id } = c.req.param();
-    const { startTime, endTime, materials, notes } = await c.req.json();
+    const {
+      startTime,
+      endTime,
+      materials,
+      notes,
+      laborCost = 0,
+      materialsCost = 0,
+      taxRate = 0 // Tax rate as percentage (e.g., 8.25 for 8.25%)
+    } = await c.req.json();
 
-    // Check if booking exists
+    // Check if booking exists with related data
     const booking = await prisma.booking.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
+      include: {
+        client: true,
+        contractor: true,
+        service: true
+      }
     });
 
     if (!booking) {
@@ -743,7 +756,18 @@ bookings.post('/bookings/:id/complete', async (c) => {
       }, 404);
     }
 
-    // Create job completion and update booking status in transaction
+    // Calculate invoice amounts
+    const subtotal = (laborCost || 0) + (materialsCost || 0);
+    // If no costs provided, use the booking price as the amount
+    const amount = subtotal > 0 ? subtotal : (booking.price || 0);
+    const taxAmount = amount * (taxRate / 100);
+    const totalAmount = amount + taxAmount;
+
+    // Set due date to 30 days from now
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    // Create job completion, invoice, and update booking status in transaction
     const result = await prisma.$transaction(async (tx) => {
       const completion = await tx.jobCompletion.create({
         data: {
@@ -755,18 +779,37 @@ bookings.post('/bookings/:id/complete', async (c) => {
         }
       });
 
-      const updatedBooking = await tx.booking.update({
-        where: { id: parseInt(id) },
-        data: { status: BookingStatus.COMPLETED }
+      // Create the invoice
+      const invoice = await tx.invoice.create({
+        data: {
+          bookingId: parseInt(id),
+          amount,
+          taxAmount: taxAmount > 0 ? taxAmount : null,
+          totalAmount,
+          status: 'PENDING',
+          dueDate
+        }
       });
 
-      return { completion, booking: updatedBooking };
+      const updatedBooking = await tx.booking.update({
+        where: { id: parseInt(id) },
+        data: { status: BookingStatus.COMPLETED },
+        include: {
+          client: true,
+          service: true,
+          invoice: true
+        }
+      });
+
+      return { completion, invoice, booking: updatedBooking };
     });
 
     return c.json({
       success: true,
       completion: result.completion,
-      message: 'Job marked as complete'
+      invoice: result.invoice,
+      booking: result.booking,
+      message: 'Job marked as complete and invoice generated'
     });
   } catch (error) {
     console.error('Complete booking error:', error);
@@ -886,6 +929,116 @@ bookings.delete('/bookings/:id/permanent', async (c) => {
     return c.json({
       success: false,
       error: 'Failed to delete booking'
+    }, 500);
+  }
+});
+
+// ============================================
+// INVOICE ENDPOINTS
+// ============================================
+
+// GET /api/invoices/contractor/:contractorId - Get all invoices for a contractor
+bookings.get('/invoices/contractor/:contractorId', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = c.req.param();
+    const { status } = c.req.query();
+
+    const where: any = {
+      booking: {
+        contractorId: parseInt(contractorId)
+      }
+    };
+
+    if (status && ['PENDING', 'PAID', 'OVERDUE', 'CANCELLED'].includes(status)) {
+      where.status = status;
+    }
+
+    const invoices = await prisma.invoice.findMany({
+      where,
+      include: {
+        booking: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true
+              }
+            },
+            service: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return c.json({
+      success: true,
+      invoices
+    });
+  } catch (error) {
+    console.error('Fetch invoices error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch invoices'
+    }, 500);
+  }
+});
+
+// PATCH /api/invoices/:id/status - Update invoice status (e.g., mark as paid)
+bookings.patch('/invoices/:id/status', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { id } = c.req.param();
+    const { status } = await c.req.json();
+
+    if (!status || !['PENDING', 'PAID', 'OVERDUE', 'CANCELLED'].includes(status)) {
+      return c.json({
+        success: false,
+        error: 'Invalid status. Must be PENDING, PAID, OVERDUE, or CANCELLED'
+      }, 400);
+    }
+
+    const updateData: any = { status };
+
+    // If marking as paid, set paidAt timestamp
+    if (status === 'PAID') {
+      updateData.paidAt = new Date();
+    }
+
+    const invoice = await prisma.invoice.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        booking: {
+          include: {
+            client: true,
+            service: true
+          }
+        }
+      }
+    });
+
+    return c.json({
+      success: true,
+      invoice,
+      message: `Invoice marked as ${status.toLowerCase()}`
+    });
+  } catch (error) {
+    console.error('Update invoice status error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to update invoice status'
     }, 500);
   }
 });

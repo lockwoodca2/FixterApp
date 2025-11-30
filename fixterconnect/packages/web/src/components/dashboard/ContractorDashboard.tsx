@@ -70,13 +70,13 @@ const ContractorDashboard: React.FC = () => {
   // Schedule Manager states
   const [scheduleView, setScheduleView] = useState<'recurring' | 'calendar'>('calendar');
   const [weeklySchedule, setWeeklySchedule] = useState<any>({
-    monday: { available: true, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 6, serviceAreas: ['Nampa', 'Caldwell'] },
-    tuesday: { available: true, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 6, serviceAreas: ['Meridian', 'Kuna'] },
-    wednesday: { available: true, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 6, serviceAreas: [] },
-    thursday: { available: true, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 6, serviceAreas: [] },
-    friday: { available: true, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 6, serviceAreas: [] },
-    saturday: { available: true, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 4, serviceAreas: [] },
-    sunday: { available: false, startTime: '08:00', startPeriod: 'AM', endTime: '05:00', endPeriod: 'PM', maxJobs: 0, serviceAreas: [] }
+    monday: { available: true, startTime: '08:00', endTime: '17:00', maxJobs: 6, serviceAreas: ['Nampa', 'Caldwell'] },
+    tuesday: { available: true, startTime: '08:00', endTime: '17:00', maxJobs: 6, serviceAreas: ['Meridian', 'Kuna'] },
+    wednesday: { available: true, startTime: '08:00', endTime: '17:00', maxJobs: 6, serviceAreas: [] },
+    thursday: { available: true, startTime: '08:00', endTime: '17:00', maxJobs: 6, serviceAreas: [] },
+    friday: { available: true, startTime: '08:00', endTime: '17:00', maxJobs: 6, serviceAreas: [] },
+    saturday: { available: true, startTime: '08:00', endTime: '17:00', maxJobs: 4, serviceAreas: [] },
+    sunday: { available: false, startTime: '08:00', endTime: '17:00', maxJobs: 0, serviceAreas: [] }
   });
   const serviceAreasList = ['Boise', 'Meridian', 'Nampa', 'Caldwell', 'Eagle', 'Kuna', 'Star', 'Garden City'];
 
@@ -112,9 +112,7 @@ const ContractorDashboard: React.FC = () => {
     endDate: '',
     isAvailable: true,
     startTime: '08:00',
-    startPeriod: 'AM',
-    endTime: '05:00',
-    endPeriod: 'PM',
+    endTime: '17:00',
     maxJobs: 6,
     reason: ''
   });
@@ -133,6 +131,17 @@ const ContractorDashboard: React.FC = () => {
   const [messageToFlag, setMessageToFlag] = useState<any>(null);
   const [flagReason, setFlagReason] = useState('');
   const [flagDetails, setFlagDetails] = useState('');
+
+  // Job Completion Modal states
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [jobToComplete, setJobToComplete] = useState<any>(null);
+  const [completionForm, setCompletionForm] = useState({
+    laborCost: '',
+    materialsCost: '',
+    taxRate: '0',
+    notes: '',
+    materials: ''
+  });
 
   // Settings states
   const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials'>('profile');
@@ -230,55 +239,20 @@ const ContractorDashboard: React.FC = () => {
             loadedSchedule[day] = {
               available: false,
               startTime: '08:00',
-              startPeriod: 'AM',
-              endTime: '05:00',
-              endPeriod: 'PM',
+              endTime: '17:00',
               maxJobs: 6,
               serviceAreas: []
             };
           });
 
-          // Load saved schedule data
+          // Load saved schedule data (times already in 24-hour format from API)
           scheduleData.schedule.forEach((entry: any) => {
             const dayName = dayNames[entry.dayOfWeek];
 
-            // Convert 24-hour time to 12-hour format
-            const startHour = parseInt(entry.startTime.split(':')[0]);
-            const startMin = entry.startTime.split(':')[1];
-            let startHour12 = startHour;
-            let startPeriod = 'AM';
-            if (startHour === 0) {
-              startHour12 = 12;
-              startPeriod = 'AM';
-            } else if (startHour === 12) {
-              startHour12 = 12;
-              startPeriod = 'PM';
-            } else if (startHour > 12) {
-              startHour12 = startHour - 12;
-              startPeriod = 'PM';
-            }
-
-            const endHour = parseInt(entry.endTime.split(':')[0]);
-            const endMin = entry.endTime.split(':')[1];
-            let endHour12 = endHour;
-            let endPeriod = 'AM';
-            if (endHour === 0) {
-              endHour12 = 12;
-              endPeriod = 'AM';
-            } else if (endHour === 12) {
-              endHour12 = 12;
-              endPeriod = 'PM';
-            } else if (endHour > 12) {
-              endHour12 = endHour - 12;
-              endPeriod = 'PM';
-            }
-
             loadedSchedule[dayName] = {
               available: entry.isAvailable,
-              startTime: `${String(startHour12).padStart(2, '0')}:${startMin}`,
-              startPeriod: startPeriod,
-              endTime: `${String(endHour12).padStart(2, '0')}:${endMin}`,
-              endPeriod: endPeriod,
+              startTime: entry.startTime,
+              endTime: entry.endTime,
               maxJobs: entry.maxBookings,
               serviceAreas: entry.serviceAreas || []
             };
@@ -968,6 +942,60 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
+  const handleCompleteJob = (job: any) => {
+    setJobToComplete(job);
+    // Pre-fill with booking price if available
+    setCompletionForm({
+      laborCost: job.price ? String(job.price) : '',
+      materialsCost: '',
+      taxRate: '0',
+      notes: '',
+      materials: ''
+    });
+    setShowCompleteModal(true);
+  };
+
+  const submitJobCompletion = async () => {
+    if (!jobToComplete) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${jobToComplete.id}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          laborCost: parseFloat(completionForm.laborCost) || 0,
+          materialsCost: parseFloat(completionForm.materialsCost) || 0,
+          taxRate: parseFloat(completionForm.taxRate) || 0,
+          notes: completionForm.notes,
+          materials: completionForm.materials
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showToast('Job marked as complete! Invoice generated.', 'success');
+        setShowCompleteModal(false);
+        setJobToComplete(null);
+        setCompletionForm({
+          laborCost: '',
+          materialsCost: '',
+          taxRate: '0',
+          notes: '',
+          materials: ''
+        });
+        fetchContractorData();
+      } else {
+        showToast(data.error || 'Failed to complete job', 'error');
+      }
+    } catch (error) {
+      console.error('Error completing job:', error);
+      showToast('Failed to complete job. Please try again.', 'error');
+    }
+  };
+
   const handleCancelJob = async (jobId: number, jobName: string) => {
     const confirmed = window.confirm(`Are you sure you want to cancel "${jobName}"?`);
     if (!confirmed) return;
@@ -1220,6 +1248,7 @@ const ContractorDashboard: React.FC = () => {
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
                   <button
+                    onClick={() => handleCompleteJob(job)}
                     disabled={!isJobToday(job.scheduledDate)}
                     style={{
                       padding: '12px 24px',
@@ -1433,6 +1462,45 @@ const ContractorDashboard: React.FC = () => {
     </div>
   );
 
+  const handleMarkInvoicePaid = async (invoiceId: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'PAID' })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showToast('Invoice marked as paid', 'success');
+        fetchContractorData();
+      } else {
+        showToast(data.error || 'Failed to update invoice', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating invoice:', error);
+      showToast('Failed to update invoice', 'error');
+    }
+  };
+
+  const getInvoiceStatusColor = (status: string) => {
+    switch (status) {
+      case 'PAID':
+        return { bg: '#dcfce7', text: '#166534' };
+      case 'PENDING':
+        return { bg: '#fef3c7', text: '#92400e' };
+      case 'OVERDUE':
+        return { bg: '#fee2e2', text: '#991b1b' };
+      case 'CANCELLED':
+        return { bg: '#f1f5f9', text: '#64748b' };
+      default:
+        return { bg: '#f1f5f9', text: '#64748b' };
+    }
+  };
+
   const renderInvoices = () => (
     <div style={{ padding: '24px' }}>
       <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
@@ -1440,46 +1508,108 @@ const ContractorDashboard: React.FC = () => {
       </h2>
       {invoices.length > 0 ? (
         <div style={{ display: 'grid', gap: '16px' }}>
-          {invoices.map(invoice => (
-            <div
-              key={invoice.id}
-              style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>
-                    Invoice #{invoice.invoiceNumber}
-                  </h3>
-                  <p style={{ color: '#64748b', fontSize: '14px' }}>
-                    {invoice.service} - {invoice.provider}
-                  </p>
+          {invoices.map((invoice: any) => {
+            const statusColors = getInvoiceStatusColor(invoice.status);
+            return (
+              <div
+                key={invoice.id}
+                style={{
+                  backgroundColor: 'white',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 8px 0' }}>
+                      Invoice #{invoice.id}
+                    </h3>
+                    <p style={{ color: '#1e293b', fontSize: '14px', margin: '0 0 4px 0', fontWeight: '500' }}>
+                      {invoice.booking?.service?.name || 'Service'}
+                    </p>
+                    <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 4px 0' }}>
+                      {invoice.booking?.client?.firstName} {invoice.booking?.client?.lastName}
+                    </p>
+                    <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>
+                      Created: {new Date(invoice.createdAt).toLocaleDateString()}
+                      {invoice.dueDate && ` • Due: ${new Date(invoice.dueDate).toLocaleDateString()}`}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 8px 0' }}>
+                      ${invoice.totalAmount?.toFixed(2) || '0.00'}
+                    </p>
+                    <span style={{
+                      padding: '4px 12px',
+                      backgroundColor: statusColors.bg,
+                      color: statusColors.text,
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      display: 'inline-block'
+                    }}>
+                      {invoice.status}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b' }}>
-                    ${invoice.amount}
-                  </p>
-                  <span style={{
-                    padding: '4px 8px',
-                    backgroundColor: invoice.status === 'paid' ? '#dcfce7' : '#fef3c7',
-                    color: invoice.status === 'paid' ? '#166534' : '#92400e',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '600'
-                  }}>
-                    {invoice.status.toUpperCase()}
-                  </span>
+
+                {/* Invoice details breakdown */}
+                <div style={{
+                  marginTop: '16px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ display: 'flex', gap: '24px', fontSize: '13px', color: '#64748b' }}>
+                    <span>Subtotal: ${invoice.amount?.toFixed(2) || '0.00'}</span>
+                    {invoice.taxAmount && <span>Tax: ${invoice.taxAmount.toFixed(2)}</span>}
+                  </div>
+
+                  {invoice.status === 'PENDING' && (
+                    <button
+                      onClick={() => handleMarkInvoicePaid(invoice.id)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Mark as Paid
+                    </button>
+                  )}
+
+                  {invoice.status === 'PAID' && invoice.paidAt && (
+                    <span style={{ fontSize: '12px', color: '#10b981' }}>
+                      Paid on {new Date(invoice.paidAt).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <p style={{ color: '#94a3b8' }}>No invoices</p>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '48px',
+          borderRadius: '12px',
+          textAlign: 'center',
+          border: '1px solid #e2e8f0'
+        }}>
+          <FileText size={48} color="#cbd5e1" style={{ margin: '0 auto 16px' }} />
+          <p style={{ color: '#94a3b8', fontSize: '16px', margin: 0 }}>No invoices yet</p>
+          <p style={{ color: '#cbd5e1', fontSize: '14px', marginTop: '8px' }}>
+            Invoices will appear here when you complete jobs
+          </p>
+        </div>
       )}
     </div>
   );
@@ -1966,6 +2096,7 @@ const ContractorDashboard: React.FC = () => {
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
                       <button
+                        onClick={() => handleCompleteJob(job)}
                         disabled={!isJobToday(job.scheduledDate)}
                         style={{
                           padding: '12px 24px',
@@ -2145,27 +2276,6 @@ const ContractorDashboard: React.FC = () => {
                                 fontFamily: 'inherit'
                               }}
                             />
-                            <select
-                              value={schedule.startPeriod}
-                              onChange={(e) => {
-                                setWeeklySchedule({
-                                  ...weeklySchedule,
-                                  [day]: { ...schedule, startPeriod: e.target.value }
-                                });
-                              }}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                fontFamily: 'inherit',
-                                backgroundColor: 'white',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <option value="AM">AM</option>
-                              <option value="PM">PM</option>
-                            </select>
 
                             <span style={{ color: '#64748b', fontWeight: '600' }}>to</span>
 
@@ -2186,27 +2296,6 @@ const ContractorDashboard: React.FC = () => {
                                 fontFamily: 'inherit'
                               }}
                             />
-                            <select
-                              value={schedule.endPeriod}
-                              onChange={(e) => {
-                                setWeeklySchedule({
-                                  ...weeklySchedule,
-                                  [day]: { ...schedule, endPeriod: e.target.value }
-                                });
-                              }}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                fontFamily: 'inherit',
-                                backgroundColor: 'white',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              <option value="AM">AM</option>
-                              <option value="PM">PM</option>
-                            </select>
                           </div>
 
                           {/* Max Jobs */}
@@ -2331,27 +2420,11 @@ const ContractorDashboard: React.FC = () => {
                       const scheduleData = Object.entries(weeklySchedule)
                         .filter(([_, schedule]: [string, any]) => schedule.available)
                         .map(([day, schedule]: [string, any]) => {
-                          // Convert 12-hour format to 24-hour format
-                          let startHour = parseInt(schedule.startTime.split(':')[0]);
-                          const startMin = schedule.startTime.split(':')[1];
-                          if (schedule.startPeriod === 'PM' && startHour !== 12) {
-                            startHour += 12;
-                          } else if (schedule.startPeriod === 'AM' && startHour === 12) {
-                            startHour = 0;
-                          }
-
-                          let endHour = parseInt(schedule.endTime.split(':')[0]);
-                          const endMin = schedule.endTime.split(':')[1];
-                          if (schedule.endPeriod === 'PM' && endHour !== 12) {
-                            endHour += 12;
-                          } else if (schedule.endPeriod === 'AM' && endHour === 12) {
-                            endHour = 0;
-                          }
-
+                          // Times are already in 24-hour format
                           return {
                             dayOfWeek: dayMapping[day],
-                            startTime: `${String(startHour).padStart(2, '0')}:${startMin}`,
-                            endTime: `${String(endHour).padStart(2, '0')}:${endMin}`,
+                            startTime: schedule.startTime,
+                            endTime: schedule.endTime,
                             maxBookings: schedule.maxJobs,
                             isAvailable: true,
                             serviceAreas: schedule.serviceAreas
@@ -2416,9 +2489,7 @@ const ContractorDashboard: React.FC = () => {
                         endDate: '',
                         isAvailable: true,
                         startTime: '08:00',
-                        startPeriod: 'AM',
-                        endTime: '05:00',
-                        endPeriod: 'PM',
+                        endTime: '17:00',
                         maxJobs: 6,
                         reason: ''
                       });
@@ -2708,9 +2779,7 @@ const ContractorDashboard: React.FC = () => {
                                 endDate: '',
                                 isAvailable: isAvailable,
                                 startTime: defaultSchedule.startTime,
-                                startPeriod: defaultSchedule.startPeriod,
                                 endTime: defaultSchedule.endTime,
-                                endPeriod: defaultSchedule.endPeriod,
                                 maxJobs: maxJobs,
                                 reason: ''
                               });
@@ -2922,19 +2991,6 @@ const ContractorDashboard: React.FC = () => {
                                 fontSize: '14px'
                               }}
                             />
-                            <select
-                              value={overrideForm.startPeriod}
-                              onChange={(e) => setOverrideForm({ ...overrideForm, startPeriod: e.target.value })}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px'
-                              }}
-                            >
-                              <option value="AM">AM</option>
-                              <option value="PM">PM</option>
-                            </select>
                             <span style={{ color: '#64748b' }}>to</span>
                             <input
                               type="time"
@@ -2947,19 +3003,6 @@ const ContractorDashboard: React.FC = () => {
                                 fontSize: '14px'
                               }}
                             />
-                            <select
-                              value={overrideForm.endPeriod}
-                              onChange={(e) => setOverrideForm({ ...overrideForm, endPeriod: e.target.value })}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px'
-                              }}
-                            >
-                              <option value="AM">AM</option>
-                              <option value="PM">PM</option>
-                            </select>
                           </div>
                         </div>
 
@@ -3046,25 +3089,9 @@ const ContractorDashboard: React.FC = () => {
                         }
 
                         try {
-                          // Convert 12-hour time to 24-hour format
-                          let startHour = parseInt(overrideForm.startTime.split(':')[0]);
-                          const startMin = overrideForm.startTime.split(':')[1];
-                          if (overrideForm.startPeriod === 'PM' && startHour !== 12) {
-                            startHour += 12;
-                          } else if (overrideForm.startPeriod === 'AM' && startHour === 12) {
-                            startHour = 0;
-                          }
-
-                          let endHour = parseInt(overrideForm.endTime.split(':')[0]);
-                          const endMin = overrideForm.endTime.split(':')[1];
-                          if (overrideForm.endPeriod === 'PM' && endHour !== 12) {
-                            endHour += 12;
-                          } else if (overrideForm.endPeriod === 'AM' && endHour === 12) {
-                            endHour = 0;
-                          }
-
-                          const startTimeFormatted = overrideForm.isAvailable ? `${String(startHour).padStart(2, '0')}:${startMin}` : '00:00';
-                          const endTimeFormatted = overrideForm.isAvailable ? `${String(endHour).padStart(2, '0')}:${endMin}` : '00:00';
+                          // Times are already in 24-hour format from the input
+                          const startTimeFormatted = overrideForm.isAvailable ? overrideForm.startTime : '00:00';
+                          const endTimeFormatted = overrideForm.isAvailable ? overrideForm.endTime : '00:00';
                           const maxBookings = overrideForm.isAvailable ? overrideForm.maxJobs : 0;
 
                           // Handle date range
@@ -5023,6 +5050,257 @@ const ContractorDashboard: React.FC = () => {
                 }}
               >
                 Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Completion Modal */}
+      {showCompleteModal && jobToComplete && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            padding: '32px'
+          }}>
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                Complete Job
+              </h2>
+              <button
+                onClick={() => {
+                  setShowCompleteModal(false);
+                  setJobToComplete(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#64748b'
+                }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Job Info */}
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '16px',
+              borderRadius: '8px',
+              marginBottom: '24px'
+            }}>
+              <p style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#1e293b' }}>
+                {jobToComplete.service?.name}
+              </p>
+              <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>
+                {jobToComplete.client?.firstName} {jobToComplete.client?.lastName}
+              </p>
+            </div>
+
+            {/* Form Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Labor Cost */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Labor Cost ($)
+                </label>
+                <input
+                  type="number"
+                  value={completionForm.laborCost}
+                  onChange={(e) => setCompletionForm({ ...completionForm, laborCost: e.target.value })}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Materials Cost */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Materials Cost ($)
+                </label>
+                <input
+                  type="number"
+                  value={completionForm.materialsCost}
+                  onChange={(e) => setCompletionForm({ ...completionForm, materialsCost: e.target.value })}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Tax Rate */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Tax Rate (%)
+                </label>
+                <input
+                  type="number"
+                  value={completionForm.taxRate}
+                  onChange={(e) => setCompletionForm({ ...completionForm, taxRate: e.target.value })}
+                  placeholder="0"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+              {/* Materials Used */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Materials Used
+                </label>
+                <textarea
+                  value={completionForm.materials}
+                  onChange={(e) => setCompletionForm({ ...completionForm, materials: e.target.value })}
+                  placeholder="List materials used..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    minHeight: '80px',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Completion Notes
+                </label>
+                <textarea
+                  value={completionForm.notes}
+                  onChange={(e) => setCompletionForm({ ...completionForm, notes: e.target.value })}
+                  placeholder="Any notes about the completed job..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    minHeight: '80px',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Invoice Preview */}
+              <div style={{
+                backgroundColor: '#f0fdf4',
+                padding: '16px',
+                borderRadius: '8px',
+                border: '1px solid #bbf7d0'
+              }}>
+                <p style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#166534', fontSize: '14px' }}>
+                  Invoice Preview
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                  <span>Labor:</span>
+                  <span>${parseFloat(completionForm.laborCost) || 0}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                  <span>Materials:</span>
+                  <span>${parseFloat(completionForm.materialsCost) || 0}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                  <span>Tax ({completionForm.taxRate}%):</span>
+                  <span>${(((parseFloat(completionForm.laborCost) || 0) + (parseFloat(completionForm.materialsCost) || 0)) * (parseFloat(completionForm.taxRate) || 0) / 100).toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', color: '#166534', borderTop: '1px solid #bbf7d0', paddingTop: '8px', marginTop: '8px' }}>
+                  <span>Total:</span>
+                  <span>${(((parseFloat(completionForm.laborCost) || 0) + (parseFloat(completionForm.materialsCost) || 0)) * (1 + (parseFloat(completionForm.taxRate) || 0) / 100)).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'flex-end',
+              marginTop: '24px'
+            }}>
+              <button
+                onClick={() => {
+                  setShowCompleteModal(false);
+                  setJobToComplete(null);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'white',
+                  color: '#1e293b',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitJobCompletion}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Complete & Generate Invoice
               </button>
             </div>
           </div>
