@@ -260,6 +260,8 @@ profiles.put('/contractor/:id', async (c) => {
     const prisma = c.get('prisma');
     const { id } = c.req.param();
     const {
+      firstName,
+      lastName,
       name,
       email,
       phone,
@@ -278,6 +280,8 @@ profiles.put('/contractor/:id', async (c) => {
 
     const updateData: any = {};
 
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;

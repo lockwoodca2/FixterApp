@@ -214,6 +214,8 @@ auth.post('/create-account', async (c) => {
           type: UserType.CONTRACTOR,
           contractor: {
             create: {
+              firstName,
+              lastName,
               name: contractorName,
               yearsInBusiness: yearsExperience || 0,
               rating: 0,

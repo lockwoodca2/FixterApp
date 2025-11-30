@@ -77,7 +77,9 @@ model Client {
 model Contractor {
   id               Int      @id @default(autoincrement())
   userId           Int      @unique @map("user_id")
-  name             String
+  firstName        String?  @map("first_name")
+  lastName         String?  @map("last_name")
+  name             String   // Business name (computed from firstName + lastName if not set)
   email            String?
   phone            String?
   description      String?  @db.Text

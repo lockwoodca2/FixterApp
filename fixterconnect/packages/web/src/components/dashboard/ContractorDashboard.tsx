@@ -167,6 +167,8 @@ const ContractorDashboard: React.FC = () => {
     description: ''
   });
   const [profileForm, setProfileForm] = useState({
+    firstName: '',
+    lastName: '',
     name: '',
     email: '',
     phone: '',
@@ -3595,6 +3597,8 @@ const ContractorDashboard: React.FC = () => {
   useEffect(() => {
     if (profile && activeSection === 'settings' && !settingsInitialized) {
       setProfileForm({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
         name: profile.name || '',
         email: profile.email || '',
         phone: profile.phone || '',
@@ -3681,6 +3685,8 @@ const ContractorDashboard: React.FC = () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          firstName: profileForm.firstName,
+          lastName: profileForm.lastName,
           name: profileForm.name,
           email: profileForm.email,
           phone: profileForm.phone,
@@ -4061,6 +4067,44 @@ const ContractorDashboard: React.FC = () => {
     <div>
       <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '20px' }}>Profile Information</h3>
 
+      {/* Name Fields */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+        <div>
+          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+            First Name
+          </label>
+          <input
+            type="text"
+            value={profileForm.firstName}
+            onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '2px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '16px'
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
+            Last Name
+          </label>
+          <input
+            type="text"
+            value={profileForm.lastName}
+            onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '2px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '16px'
+            }}
+          />
+        </div>
+      </div>
+
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#64748b', marginBottom: '8px' }}>
           Business Name
@@ -4077,6 +4121,9 @@ const ContractorDashboard: React.FC = () => {
             fontSize: '16px'
           }}
         />
+        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '6px' }}>
+          This is the name displayed to clients
+        </p>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
