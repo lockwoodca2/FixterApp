@@ -92,8 +92,15 @@ const ContractorDashboard: React.FC = () => {
     scheduledTime: '',
     duration: '90',
     price: '',
-    notes: ''
+    notes: '',
+    beforePhotos: [] as File[],
+    afterPhotos: [] as File[]
   });
+  const [beforePhotoPreview, setBeforePhotoPreview] = useState<string[]>([]);
+  const [afterPhotoPreview, setAfterPhotoPreview] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [speechRecognition, setSpeechRecognition] = useState<any>(null);
 
   // Date Override states
   const [dateOverrides, setDateOverrides] = useState<any[]>([]);
@@ -724,6 +731,168 @@ const ContractorDashboard: React.FC = () => {
     return `${displayHours}:${endMinutes.toString().padStart(2, '0')} ${period}`;
   };
 
+  // Resize image to max 800px width
+  const resizeImage = (file: File, maxWidth: number = 800): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const resizedFile = new File([blob], file.name, { type: 'image/jpeg' });
+              resolve(resizedFile);
+            } else {
+              reject(new Error('Failed to resize image'));
+            }
+          }, 'image/jpeg', 0.85);
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle photo selection for job
+  const handleJobPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const resizedFiles: File[] = [];
+    const previews: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const resized = await resizeImage(files[i]);
+        resizedFiles.push(resized);
+        previews.push(URL.createObjectURL(resized));
+      } catch (error) {
+        console.error('Error resizing image:', error);
+      }
+    }
+
+    if (type === 'before') {
+      setAddJobForm({ ...addJobForm, beforePhotos: [...addJobForm.beforePhotos, ...resizedFiles] });
+      setBeforePhotoPreview([...beforePhotoPreview, ...previews]);
+    } else {
+      setAddJobForm({ ...addJobForm, afterPhotos: [...addJobForm.afterPhotos, ...resizedFiles] });
+      setAfterPhotoPreview([...afterPhotoPreview, ...previews]);
+    }
+  };
+
+  // Remove photo from job form
+  const handleRemoveJobPhoto = (index: number, type: 'before' | 'after') => {
+    if (type === 'before') {
+      const newPhotos = [...addJobForm.beforePhotos];
+      newPhotos.splice(index, 1);
+      setAddJobForm({ ...addJobForm, beforePhotos: newPhotos });
+      const newPreviews = [...beforePhotoPreview];
+      URL.revokeObjectURL(newPreviews[index]);
+      newPreviews.splice(index, 1);
+      setBeforePhotoPreview(newPreviews);
+    } else {
+      const newPhotos = [...addJobForm.afterPhotos];
+      newPhotos.splice(index, 1);
+      setAddJobForm({ ...addJobForm, afterPhotos: newPhotos });
+      const newPreviews = [...afterPhotoPreview];
+      URL.revokeObjectURL(newPreviews[index]);
+      newPreviews.splice(index, 1);
+      setAfterPhotoPreview(newPreviews);
+    }
+  };
+
+  // Upload photos to server
+  const uploadJobPhotos = async (bookingId: number, photos: File[], photoType: 'before' | 'after'): Promise<string[]> => {
+    if (photos.length === 0) return [];
+
+    const formData = new FormData();
+    formData.append('bookingId', bookingId.toString());
+    formData.append('photoType', photoType);
+    photos.forEach(photo => formData.append('photos', photo));
+
+    const response = await fetch(`${API_BASE_URL}/upload/job-photos`, {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+    return data.success ? data.imageUrls : [];
+  };
+
+  // Voice-to-text for notes
+  const toggleVoiceRecording = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      showToast('Voice recognition is not supported in your browser', 'error');
+      return;
+    }
+
+    if (isRecording && speechRecognition) {
+      speechRecognition.stop();
+      setIsRecording(false);
+      setSpeechRecognition(null);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setAddJobForm((prev: any) => ({
+          ...prev,
+          notes: prev.notes + (prev.notes ? ' ' : '') + finalTranscript
+        }));
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      setSpeechRecognition(null);
+      if (event.error === 'not-allowed') {
+        showToast('Microphone access denied. Please enable it in your browser settings.', 'error');
+      }
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      setSpeechRecognition(null);
+    };
+
+    recognition.start();
+    setSpeechRecognition(recognition);
+  };
+
   const handleAddJob = async () => {
     try {
       // Validate required fields
@@ -731,6 +900,8 @@ const ContractorDashboard: React.FC = () => {
         showToast('Please fill in all required fields', 'error');
         return;
       }
+
+      setUploadingPhotos(true);
 
       // Create a manual booking
       const response = await fetch(`${API_BASE_URL}/bookings/manual`, {
@@ -754,9 +925,18 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
+        // Upload photos if any
+        const bookingId = data.booking.id;
+        if (addJobForm.beforePhotos.length > 0) {
+          await uploadJobPhotos(bookingId, addJobForm.beforePhotos, 'before');
+        }
+        if (addJobForm.afterPhotos.length > 0) {
+          await uploadJobPhotos(bookingId, addJobForm.afterPhotos, 'after');
+        }
+
         showToast('Job added successfully!', 'success');
         setShowAddJobModal(false);
-        // Reset form
+        // Reset form and previews
         setAddJobForm({
           clientName: '',
           clientEmail: '',
@@ -767,8 +947,14 @@ const ContractorDashboard: React.FC = () => {
           scheduledTime: '',
           duration: '90',
           price: '',
-          notes: ''
+          notes: '',
+          beforePhotos: [],
+          afterPhotos: []
         });
+        beforePhotoPreview.forEach(url => URL.revokeObjectURL(url));
+        afterPhotoPreview.forEach(url => URL.revokeObjectURL(url));
+        setBeforePhotoPreview([]);
+        setAfterPhotoPreview([]);
         // Refresh data to show the new job
         fetchContractorData();
       } else {
@@ -777,6 +963,8 @@ const ContractorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error adding job:', error);
       showToast('Failed to add job. Please try again.', 'error');
+    } finally {
+      setUploadingPhotos(false);
     }
   };
 
@@ -5175,20 +5363,27 @@ const ContractorDashboard: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
                   Service *
                 </label>
-                <input
-                  type="text"
+                <select
                   value={addJobForm.service}
                   onChange={(e) => setAddJobForm({ ...addJobForm, service: e.target.value })}
-                  placeholder="Lawn Mowing, Hedge Trimming, etc."
                   style={{
                     width: '100%',
                     padding: '12px',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '14px',
-                    outline: 'none'
+                    outline: 'none',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
                   }}
-                />
+                >
+                  <option value="">Select a service...</option>
+                  {allServices.map((service: any) => (
+                    <option key={service.id} value={service.name}>
+                      {service.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Service Address */}
@@ -5302,25 +5497,214 @@ const ContractorDashboard: React.FC = () => {
 
               {/* Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                  Notes
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                    Notes
+                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleVoiceRecording}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: isRecording ? '#ef4444' : '#f1f5f9',
+                      color: isRecording ? 'white' : '#64748b',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                      <line x1="12" y1="19" x2="12" y2="23"></line>
+                      <line x1="8" y1="23" x2="16" y2="23"></line>
+                    </svg>
+                    {isRecording ? 'Stop Recording' : 'Voice to Text'}
+                  </button>
+                </div>
+                {isRecording && (
+                  <div style={{
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    padding: '8px 12px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <div style={{
+                      width: '10px',
+                      height: '10px',
+                      backgroundColor: '#ef4444',
+                      borderRadius: '50%',
+                      animation: 'pulse 1s infinite'
+                    }} />
+                    <span style={{ fontSize: '13px', color: '#dc2626' }}>
+                      Listening... Speak now
+                    </span>
+                  </div>
+                )}
                 <textarea
                   value={addJobForm.notes}
                   onChange={(e) => setAddJobForm({ ...addJobForm, notes: e.target.value })}
-                  placeholder="Any special instructions or notes..."
+                  placeholder="Any special instructions or notes... (or use voice-to-text)"
                   rows={3}
                   style={{
                     width: '100%',
                     padding: '12px',
-                    border: '1px solid #e2e8f0',
+                    border: isRecording ? '2px solid #ef4444' : '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '14px',
                     outline: 'none',
                     resize: 'vertical',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
                   }}
                 />
+              </div>
+
+              {/* Before Photos */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Before Photos (optional)
+                </label>
+                <div style={{
+                  border: '2px dashed #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: '#f8fafc'
+                }}
+                onClick={() => document.getElementById('before-photo-input')?.click()}
+                >
+                  <input
+                    id="before-photo-input"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleJobPhotoSelect(e, 'before')}
+                    style={{ display: 'none' }}
+                  />
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+                    Click to upload before photos (resized to 800px)
+                  </p>
+                </div>
+                {beforePhotoPreview.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                    {beforePhotoPreview.map((url, index) => (
+                      <div key={index} style={{ position: 'relative' }}>
+                        <img
+                          src={url}
+                          alt={`Before ${index + 1}`}
+                          style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }}
+                        />
+                        <button
+                          onClick={() => handleRemoveJobPhoto(index, 'before')}
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* After Photos */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  After Photos (optional)
+                </label>
+                <div style={{
+                  border: '2px dashed #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: '#f8fafc'
+                }}
+                onClick={() => document.getElementById('after-photo-input')?.click()}
+                >
+                  <input
+                    id="after-photo-input"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleJobPhotoSelect(e, 'after')}
+                    style={{ display: 'none' }}
+                  />
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+                    Click to upload after photos (resized to 800px)
+                  </p>
+                </div>
+                {afterPhotoPreview.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                    {afterPhotoPreview.map((url, index) => (
+                      <div key={index} style={{ position: 'relative' }}>
+                        <img
+                          src={url}
+                          alt={`After ${index + 1}`}
+                          style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }}
+                        />
+                        <button
+                          onClick={() => handleRemoveJobPhoto(index, 'after')}
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -5328,6 +5712,7 @@ const ContractorDashboard: React.FC = () => {
             <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => setShowAddJobModal(false)}
+                disabled={uploadingPhotos}
                 style={{
                   padding: '12px 24px',
                   backgroundColor: 'white',
@@ -5336,25 +5721,27 @@ const ContractorDashboard: React.FC = () => {
                   borderRadius: '8px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: 'pointer'
+                  cursor: uploadingPhotos ? 'not-allowed' : 'pointer',
+                  opacity: uploadingPhotos ? 0.6 : 1
                 }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddJob}
+                disabled={uploadingPhotos}
                 style={{
                   padding: '12px 24px',
-                  backgroundColor: '#10b981',
+                  backgroundColor: uploadingPhotos ? '#9ca3af' : '#10b981',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: 'pointer'
+                  cursor: uploadingPhotos ? 'not-allowed' : 'pointer'
                 }}
               >
-                Add Job
+                {uploadingPhotos ? 'Adding Job...' : 'Add Job'}
               </button>
             </div>
           </div>
