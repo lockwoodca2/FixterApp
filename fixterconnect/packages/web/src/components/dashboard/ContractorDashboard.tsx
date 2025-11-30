@@ -1509,38 +1509,70 @@ const ContractorDashboard: React.FC = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '12px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => handleCompleteJob(job)}
-                    disabled={!isJobToday(job.scheduledDate)}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: isJobToday(job.scheduledDate) ? '#10b981' : '#9ca3af',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '700',
-                      cursor: isJobToday(job.scheduledDate) ? 'pointer' : 'not-allowed',
-                      textTransform: 'uppercase'
-                    }}>
-                    COMPLETE
-                  </button>
-                  <button
-                    onClick={() => handleCancelJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: '#ef4444',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      textTransform: 'uppercase'
-                    }}>
-                    CANCEL
-                  </button>
+                <div style={{ display: 'flex', gap: '12px', flexShrink: 0, alignItems: 'center' }}>
+                  {job.status === 'COMPLETED' ? (
+                    <>
+                      <span style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#dcfce7',
+                        color: '#166534',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                      }}>
+                        Complete
+                      </span>
+                      <button
+                        onClick={() => handleCompleteJob(job)}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: 'white',
+                          color: '#1e293b',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          textTransform: 'uppercase'
+                        }}>
+                        EDIT
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleCompleteJob(job)}
+                        disabled={!isJobToday(job.scheduledDate)}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: isJobToday(job.scheduledDate) ? '#10b981' : '#9ca3af',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          cursor: isJobToday(job.scheduledDate) ? 'pointer' : 'not-allowed',
+                          textTransform: 'uppercase'
+                        }}>
+                        COMPLETE
+                      </button>
+                      <button
+                        onClick={() => handleCancelJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          textTransform: 'uppercase'
+                        }}>
+                        CANCEL
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
           ))}
