@@ -3558,9 +3558,10 @@ const ContractorDashboard: React.FC = () => {
     }
   }, [activeSection, user?.id]);
 
-  // Populate profile form when profile data is available
+  // Populate profile form when navigating to settings (only on initial load or section change)
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
   useEffect(() => {
-    if (profile && activeSection === 'settings') {
+    if (profile && activeSection === 'settings' && !settingsInitialized) {
       setProfileForm({
         name: profile.name || '',
         email: profile.email || '',
@@ -3575,8 +3576,13 @@ const ContractorDashboard: React.FC = () => {
         hourlyRate: profile.hourlyRate?.toString() || '',
         taxRate: profile.taxRate?.toString() || ''
       });
+      setSettingsInitialized(true);
     }
-  }, [profile, activeSection]);
+    // Reset initialized flag when leaving settings
+    if (activeSection !== 'settings') {
+      setSettingsInitialized(false);
+    }
+  }, [profile, activeSection, settingsInitialized]);
 
   const loadSettingsData = async () => {
     if (!user?.id) return;
@@ -3661,7 +3667,15 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
       if (data.success) {
         setProfile(data.contractor);
+        // Also update the form to keep it in sync
+        setProfileForm(prev => ({
+          ...prev,
+          hourlyRate: data.contractor.hourlyRate?.toString() || '',
+          taxRate: data.contractor.taxRate?.toString() || ''
+        }));
         showToast('Profile updated successfully!', 'success');
+      } else {
+        showToast(data.error || 'Failed to save profile', 'error');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
