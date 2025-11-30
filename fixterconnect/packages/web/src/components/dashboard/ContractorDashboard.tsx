@@ -3075,10 +3075,10 @@ const ContractorDashboard: React.FC = () => {
 
   // Load settings data when settings tab is active
   useEffect(() => {
-    if (activeSection === 'settings' && user?.id) {
+    if (activeSection === 'settings' && user?.id && profile) {
       loadSettingsData();
     }
-  }, [activeSection, user?.id]);
+  }, [activeSection, user?.id, profile]);
 
   const loadSettingsData = async () => {
     if (!user?.id) return;
