@@ -267,21 +267,45 @@ const ContractorDetails: React.FC = () => {
   };
 
   const getAvailableTimes = () => {
-    if (selectedDate && availableTimeSlots.length > 0) {
-      return availableTimeSlots;
-    }
-
-    // Default time slots if no date selected yet
-    return [
+    let times = availableTimeSlots.length > 0 ? availableTimeSlots : [
       '8:00 AM',
       '9:00 AM',
       '10:00 AM',
       '11:00 AM',
+      '12:00 PM',
       '1:00 PM',
       '2:00 PM',
       '3:00 PM',
       '4:00 PM'
     ];
+
+    // If selected date is today, filter out past times
+    if (selectedDate === getLocalDateString()) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinutes = now.getMinutes();
+
+      times = times.filter(timeStr => {
+        // Parse time like "8:00 AM" or "1:00 PM"
+        const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (!match) return true;
+
+        let hour = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3].toUpperCase();
+
+        // Convert to 24-hour format
+        if (period === 'PM' && hour !== 12) hour += 12;
+        if (period === 'AM' && hour === 12) hour = 0;
+
+        // Compare with current time (allow booking if at least in the current hour)
+        if (hour < currentHour) return false;
+        if (hour === currentHour && minutes <= currentMinutes) return false;
+        return true;
+      });
+    }
+
+    return times;
   };
 
   // Check if a specific date has availability
