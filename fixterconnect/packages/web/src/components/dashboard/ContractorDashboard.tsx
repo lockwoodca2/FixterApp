@@ -3075,10 +3075,28 @@ const ContractorDashboard: React.FC = () => {
 
   // Load settings data when settings tab is active
   useEffect(() => {
-    if (activeSection === 'settings' && user?.id && profile) {
+    if (activeSection === 'settings' && user?.id) {
       loadSettingsData();
     }
-  }, [activeSection, user?.id, profile]);
+  }, [activeSection, user?.id]);
+
+  // Populate profile form when profile data is available
+  useEffect(() => {
+    if (profile && activeSection === 'settings') {
+      setProfileForm({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        description: profile.description || '',
+        yearsInBusiness: profile.yearsInBusiness?.toString() || '',
+        location: profile.location || '',
+        googleBusinessUrl: profile.googleBusinessUrl || '',
+        licensed: profile.licensed || false,
+        insured: profile.insured || false,
+        afterHoursAvailable: profile.afterHoursAvailable || false
+      });
+    }
+  }, [profile, activeSection]);
 
   const loadSettingsData = async () => {
     if (!user?.id) return;
@@ -3131,22 +3149,6 @@ const ContractorDashboard: React.FC = () => {
       const contractorLanguagesData = await contractorLanguagesResponse.json();
       if (contractorLanguagesData.success) {
         setContractorLanguages(contractorLanguagesData.languages.map((l: any) => l.id));
-      }
-
-      // Initialize profile form with current profile data
-      if (profile) {
-        setProfileForm({
-          name: profile.name || '',
-          email: profile.email || '',
-          phone: profile.phone || '',
-          description: profile.description || '',
-          yearsInBusiness: profile.yearsInBusiness?.toString() || '',
-          location: profile.location || '',
-          googleBusinessUrl: profile.googleBusinessUrl || '',
-          licensed: profile.licensed || false,
-          insured: profile.insured || false,
-          afterHoursAvailable: profile.afterHoursAvailable || false
-        });
       }
     } catch (error) {
       console.error('Error loading settings data:', error);
