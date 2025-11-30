@@ -1354,11 +1354,23 @@ const AdminDashboard: React.FC = () => {
                   {service.active ? 'DEACTIVATE' : 'ACTIVATE'}
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: Implement delete with confirmation
+                  onClick={async () => {
                     if (window.confirm(`Delete "${service.name}"? This will remove it from all contractors. This cannot be undone.`)) {
-                      const updatedServices = services.filter(s => s.id !== service.id);
-                      setServices(updatedServices);
+                      try {
+                        const response = await fetch(`${API_BASE_URL}/admin/services/${service.id}`, {
+                          method: 'DELETE'
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                          setServices(services.filter(s => s.id !== service.id));
+                          showToast('Service deleted successfully', 'success');
+                        } else {
+                          showToast(data.error || 'Failed to delete service', 'error');
+                        }
+                      } catch (error) {
+                        console.error('Delete service error:', error);
+                        showToast('Failed to delete service', 'error');
+                      }
                     }
                   }}
                   style={{
