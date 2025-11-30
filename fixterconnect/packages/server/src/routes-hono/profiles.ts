@@ -125,6 +125,11 @@ profiles.get('/contractor/:id', async (c) => {
             }
           }
         },
+        languages: {
+          include: {
+            language: true
+          }
+        },
         reviews: {
           include: {
             client: {
@@ -234,6 +239,7 @@ profiles.get('/contractor/:id', async (c) => {
           licensed: contractor.licensed,
           insured: contractor.insured,
           afterHoursAvailable: contractor.afterHoursAvailable,
+          languages: contractor.languages?.map((cl: any) => cl.language) || [],
           isJustJoined,
           isRisingStar
         }
@@ -264,7 +270,8 @@ profiles.put('/contractor/:id', async (c) => {
       verified,
       licensed,
       insured,
-      afterHoursAvailable
+      afterHoursAvailable,
+      speaksSpanish
     } = await c.req.json();
 
     const updateData: any = {};
@@ -280,6 +287,7 @@ profiles.put('/contractor/:id', async (c) => {
     if (licensed !== undefined) updateData.licensed = licensed;
     if (insured !== undefined) updateData.insured = insured;
     if (afterHoursAvailable !== undefined) updateData.afterHoursAvailable = afterHoursAvailable;
+    if (speaksSpanish !== undefined) updateData.speaksSpanish = speaksSpanish;
 
     const contractor = await prisma.contractor.update({
       where: { id: parseInt(id) },

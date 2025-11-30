@@ -924,6 +924,24 @@ const ContractorDetails: React.FC = () => {
                     After-Hours
                   </div>
                 )}
+                {contractor.trustSignals?.languages?.map((lang: any) => (
+                  <div
+                    key={lang.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: '#fef3c7',
+                      color: '#92400e',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    {lang.flag} {lang.name}
+                  </div>
+                ))}
                 {contractor.trustSignals?.isJustJoined && (
                   <div style={{
                     display: 'inline-flex',

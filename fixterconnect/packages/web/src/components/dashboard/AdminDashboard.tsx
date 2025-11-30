@@ -18,10 +18,20 @@ import {
   Edit,
   ToggleLeft,
   ToggleRight,
-  MapPin
+  MapPin,
+  Globe
 } from 'react-feather';
 
-type AdminSection = 'users' | 'messages' | 'reports' | 'activity' | 'services' | 'service-areas';
+type AdminSection = 'users' | 'messages' | 'reports' | 'activity' | 'services' | 'service-areas' | 'languages';
+
+interface Language {
+  id: number;
+  name: string;
+  code: string;
+  flag: string;
+  isActive: boolean;
+  createdAt: string;
+}
 type UserType = 'client' | 'contractor';
 
 interface User {
@@ -122,6 +132,12 @@ const AdminDashboard: React.FC = () => {
   const [editingArea, setEditingArea] = useState<any>(null);
   const [areaForm, setAreaForm] = useState({ name: '', state: '' });
 
+  // Languages state
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [showAddLanguageModal, setShowAddLanguageModal] = useState(false);
+  const [editingLanguage, setEditingLanguage] = useState<Language | null>(null);
+  const [languageForm, setLanguageForm] = useState({ name: '', code: '', flag: '' });
+
   // Fetch admin data when authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -166,6 +182,13 @@ const AdminDashboard: React.FC = () => {
       const areasData = await areasResponse.json();
       if (areasData.success) {
         setServiceAreas(areasData.serviceAreas);
+      }
+
+      // Fetch languages
+      const languagesResponse = await fetch(`${API_BASE_URL}/languages/all`);
+      const languagesData = await languagesResponse.json();
+      if (languagesData.success) {
+        setLanguages(languagesData.languages);
       }
 
     } catch (error) {
@@ -411,6 +434,7 @@ const AdminDashboard: React.FC = () => {
     { id: 'users' as AdminSection, label: 'User Management', icon: Users },
     { id: 'services' as AdminSection, label: 'Services Management', icon: Briefcase },
     { id: 'service-areas' as AdminSection, label: 'Service Areas', icon: MapPin },
+    { id: 'languages' as AdminSection, label: 'Languages', icon: Globe },
     { id: 'messages' as AdminSection, label: 'Message Monitoring', icon: MessageSquare },
     { id: 'reports' as AdminSection, label: 'Reports & Flags', icon: AlertTriangle },
     { id: 'activity' as AdminSection, label: 'Activity Logs', icon: Activity }
@@ -1869,6 +1893,356 @@ const AdminDashboard: React.FC = () => {
     );
   };
 
+  // Languages Management Section
+  const renderLanguagesManagement = () => {
+    const handleSaveLanguage = async () => {
+      try {
+        if (!languageForm.name.trim() || !languageForm.code.trim() || !languageForm.flag.trim()) {
+          alert('Please fill in all fields');
+          return;
+        }
+
+        if (editingLanguage) {
+          // Update existing language
+          const response = await fetch(`${API_BASE_URL}/languages/${editingLanguage.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(languageForm)
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            setLanguages(languages.map(l =>
+              l.id === editingLanguage.id ? data.language : l
+            ));
+            setShowAddLanguageModal(false);
+            setEditingLanguage(null);
+            setLanguageForm({ name: '', code: '', flag: '' });
+          } else {
+            alert(data.error || 'Failed to update language');
+          }
+        } else {
+          // Create new language
+          const response = await fetch(`${API_BASE_URL}/languages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(languageForm)
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            setLanguages([...languages, data.language]);
+            setShowAddLanguageModal(false);
+            setLanguageForm({ name: '', code: '', flag: '' });
+          } else {
+            alert(data.error || 'Failed to create language');
+          }
+        }
+      } catch (error) {
+        console.error('Save language error:', error);
+        alert('Failed to save language');
+      }
+    };
+
+    const handleToggleLanguage = async (language: Language) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/languages/${language.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: !language.isActive })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setLanguages(languages.map(l =>
+            l.id === language.id ? { ...l, isActive: !l.isActive } : l
+          ));
+        }
+      } catch (error) {
+        console.error('Toggle language error:', error);
+      }
+    };
+
+    const handleDeleteLanguage = async (languageId: number) => {
+      if (!window.confirm('Are you sure you want to delete this language?')) return;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/languages/${languageId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setLanguages(languages.filter(l => l.id !== languageId));
+        }
+      } catch (error) {
+        console.error('Delete language error:', error);
+      }
+    };
+
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+              Languages
+            </h2>
+            <p style={{ fontSize: '16px', color: '#64748b' }}>
+              Manage languages that contractors can speak
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setEditingLanguage(null);
+              setLanguageForm({ name: '', code: '', flag: '' });
+              setShowAddLanguageModal(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 20px',
+              backgroundColor: '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            <Plus size={18} />
+            Add Language
+          </button>
+        </div>
+
+        {/* Languages List */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden'
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f8fafc' }}>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Flag</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Name</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Code</th>
+                <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Status</th>
+                <th style={{ padding: '16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {languages.map(language => (
+                <tr key={language.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '16px', fontSize: '24px' }}>{language.flag}</td>
+                  <td style={{ padding: '16px', fontSize: '15px', color: '#1e293b', fontWeight: '500' }}>{language.name}</td>
+                  <td style={{ padding: '16px', fontSize: '14px', color: '#64748b' }}>{language.code}</td>
+                  <td style={{ padding: '16px' }}>
+                    <button
+                      onClick={() => handleToggleLanguage(language)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        backgroundColor: language.isActive ? '#dcfce7' : '#f1f5f9',
+                        color: language.isActive ? '#15803d' : '#64748b',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {language.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                      {language.isActive ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
+                  <td style={{ padding: '16px', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => {
+                          setEditingLanguage(language);
+                          setLanguageForm({
+                            name: language.name,
+                            code: language.code,
+                            flag: language.flag
+                          });
+                          setShowAddLanguageModal(true);
+                        }}
+                        style={{
+                          padding: '8px',
+                          backgroundColor: '#f1f5f9',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Edit size={16} color="#64748b" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLanguage(language.id)}
+                        style={{
+                          padding: '8px',
+                          backgroundColor: '#fef2f2',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Trash2 size={16} color="#ef4444" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {languages.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+                    No languages added yet. Click "Add Language" to get started.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Add/Edit Language Modal */}
+        {showAddLanguageModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              padding: '32px',
+              width: '400px',
+              maxWidth: '90%'
+            }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>
+                {editingLanguage ? 'Edit Language' : 'Add New Language'}
+              </h3>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '6px' }}>
+                  Language Name *
+                </label>
+                <input
+                  type="text"
+                  value={languageForm.name}
+                  onChange={(e) => setLanguageForm({ ...languageForm, name: e.target.value })}
+                  placeholder="e.g., Spanish"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '15px'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '6px' }}>
+                  Language Code *
+                </label>
+                <input
+                  type="text"
+                  value={languageForm.code}
+                  onChange={(e) => setLanguageForm({ ...languageForm, code: e.target.value.toLowerCase() })}
+                  placeholder="e.g., es"
+                  maxLength={5}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '15px'
+                  }}
+                />
+                <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  ISO 639-1 code (2-3 letters)
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '6px' }}>
+                  Flag Emoji *
+                </label>
+                <input
+                  type="text"
+                  value={languageForm.flag}
+                  onChange={(e) => setLanguageForm({ ...languageForm, flag: e.target.value })}
+                  placeholder="e.g., 🇲🇽"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '24px'
+                  }}
+                />
+                <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                  Copy and paste a flag emoji
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setShowAddLanguageModal(false);
+                    setEditingLanguage(null);
+                    setLanguageForm({ name: '', code: '', flag: '' });
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#f1f5f9',
+                    color: '#64748b',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveLanguage}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {editingLanguage ? 'Update' : 'Add'} Language
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -1965,6 +2339,7 @@ const AdminDashboard: React.FC = () => {
         {activeSection === 'users' && renderUserManagement()}
         {activeSection === 'services' && renderServicesManagement()}
         {activeSection === 'service-areas' && renderServiceAreasManagement()}
+        {activeSection === 'languages' && renderLanguagesManagement()}
         {activeSection === 'messages' && renderMessageMonitoring()}
         {activeSection === 'reports' && renderReports()}
         {activeSection === 'activity' && renderActivityLogs()}

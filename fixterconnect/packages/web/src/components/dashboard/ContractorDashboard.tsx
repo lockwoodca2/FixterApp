@@ -134,6 +134,8 @@ const ContractorDashboard: React.FC = () => {
   const [contractorServices, setContractorServices] = useState<number[]>([]);
   const [allServiceAreas, setAllServiceAreas] = useState<any[]>([]); // Master list from admin
   const [contractorAreas, setContractorAreas] = useState<string[]>([]);
+  const [allLanguages, setAllLanguages] = useState<any[]>([]); // Master list of languages from admin
+  const [contractorLanguages, setContractorLanguages] = useState<number[]>([]); // Language IDs contractor speaks
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
   const [materialForm, setMaterialForm] = useState({
@@ -3117,6 +3119,20 @@ const ContractorDashboard: React.FC = () => {
         setMaterials(materialsData.materials);
       }
 
+      // Load all available languages (master list from admin)
+      const languagesResponse = await fetch(`${API_BASE_URL}/languages`);
+      const languagesData = await languagesResponse.json();
+      if (languagesData.success) {
+        setAllLanguages(languagesData.languages);
+      }
+
+      // Load contractor's languages
+      const contractorLanguagesResponse = await fetch(`${API_BASE_URL}/contractor/${user.id}/languages`);
+      const contractorLanguagesData = await contractorLanguagesResponse.json();
+      if (contractorLanguagesData.success) {
+        setContractorLanguages(contractorLanguagesData.languages.map((l: any) => l.id));
+      }
+
       // Initialize profile form with current profile data
       if (profile) {
         setProfileForm({
@@ -3166,6 +3182,30 @@ const ContractorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error saving profile:', error);
       showToast('Failed to save profile', 'error');
+    }
+  };
+
+  const handleToggleLanguage = async (languageId: number) => {
+    if (!user?.id) return;
+
+    const isSelected = contractorLanguages.includes(languageId);
+    const newLanguages = isSelected
+      ? contractorLanguages.filter(id => id !== languageId)
+      : [...contractorLanguages, languageId];
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractor/${user.id}/languages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ languageIds: newLanguages })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setContractorLanguages(newLanguages);
+      }
+    } catch (error) {
+      console.error('Error updating languages:', error);
     }
   };
 
@@ -3671,6 +3711,33 @@ const ContractorDashboard: React.FC = () => {
           </label>
         </div>
       </div>
+
+      {/* Languages Section */}
+      {allLanguages.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>
+            Languages Spoken
+          </h3>
+          <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+            Select all languages you can communicate in with clients
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {allLanguages.map(language => (
+              <label key={language.id} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={contractorLanguages.includes(language.id)}
+                  onChange={() => handleToggleLanguage(language.id)}
+                  style={{ width: '18px', height: '18px', marginRight: '12px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '15px', color: '#1e293b' }}>
+                  <strong>{language.flag} {language.name}</strong>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button
         onClick={handleSaveProfile}

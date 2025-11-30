@@ -88,6 +88,7 @@ model Contractor {
   licensed         Boolean  @default(false)
   insured          Boolean  @default(false)
   afterHoursAvailable Boolean @default(false) @map("after_hours_available")
+  speaksSpanish    Boolean  @default(false) @map("speaks_spanish")
   rating           Float    @default(0)
   reviewCount      Int      @default(0) @map("review_count")
   profilePicture   String?  @map("profile_picture")
@@ -109,8 +110,42 @@ model Contractor {
   flaggedMessages   FlaggedMessage[]
   favoritedBy       FavoriteContractor[]
   materials         Material[]
+  languages         ContractorLanguage[]
 
   @@map("contractors")
+}
+
+// ============================================
+// LANGUAGES
+// ============================================
+
+model Language {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique  // e.g., "Spanish", "Russian", "Chinese"
+  code        String   @unique  // e.g., "es", "ru", "zh"
+  flag        String            // e.g., "🇲🇽", "🇷🇺", "🇨🇳"
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  contractors ContractorLanguage[]
+
+  @@index([isActive])
+  @@map("languages")
+}
+
+model ContractorLanguage {
+  id           Int      @id @default(autoincrement())
+  contractorId Int      @map("contractor_id")
+  languageId   Int      @map("language_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  contractor   Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  language     Language   @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([contractorId, languageId])
+  @@map("contractor_languages")
 }
 
 // ============================================
