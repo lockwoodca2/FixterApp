@@ -3644,28 +3644,36 @@ const ContractorDashboard: React.FC = () => {
   const handleSaveProfile = async () => {
     if (!user?.id) return;
 
+    const payload = {
+      name: profileForm.name,
+      email: profileForm.email,
+      phone: profileForm.phone,
+      description: profileForm.description,
+      yearsInBusiness: profileForm.yearsInBusiness ? parseInt(profileForm.yearsInBusiness) : null,
+      location: profileForm.location,
+      googleBusinessUrl: profileForm.googleBusinessUrl,
+      licensed: profileForm.licensed,
+      insured: profileForm.insured,
+      afterHoursAvailable: profileForm.afterHoursAvailable,
+      hourlyRate: profileForm.hourlyRate ? parseFloat(profileForm.hourlyRate) : null,
+      taxRate: profileForm.taxRate ? parseFloat(profileForm.taxRate) : null
+    };
+
+    console.log('Saving profile with payload:', payload);
+
     try {
       const response = await fetch(`${API_BASE_URL}/contractor/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: profileForm.name,
-          email: profileForm.email,
-          phone: profileForm.phone,
-          description: profileForm.description,
-          yearsInBusiness: profileForm.yearsInBusiness ? parseInt(profileForm.yearsInBusiness) : null,
-          location: profileForm.location,
-          googleBusinessUrl: profileForm.googleBusinessUrl,
-          licensed: profileForm.licensed,
-          insured: profileForm.insured,
-          afterHoursAvailable: profileForm.afterHoursAvailable,
-          hourlyRate: profileForm.hourlyRate ? parseFloat(profileForm.hourlyRate) : null,
-          taxRate: profileForm.taxRate ? parseFloat(profileForm.taxRate) : null
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
+      console.log('Profile save response:', data);
+
       if (data.success) {
+        console.log('Contractor hourlyRate from response:', data.contractor.hourlyRate);
+        console.log('Contractor taxRate from response:', data.contractor.taxRate);
         setProfile(data.contractor);
         // Also update the form to keep it in sync
         setProfileForm(prev => ({
