@@ -136,12 +136,18 @@ const ContractorDashboard: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [jobToComplete, setJobToComplete] = useState<any>(null);
   const [completionForm, setCompletionForm] = useState({
-    laborCost: '',
-    materialsCost: '',
-    taxRate: '0',
+    startTime: '',
+    endTime: '',
     notes: '',
-    materials: ''
+    beforePhotos: [] as File[],
+    afterPhotos: [] as File[]
   });
+  const [completionBeforePreview, setCompletionBeforePreview] = useState<string[]>([]);
+  const [completionAfterPreview, setCompletionAfterPreview] = useState<string[]>([]);
+  const [selectedMaterials, setSelectedMaterials] = useState<Array<{ materialId: number; quantity: number }>>([]);
+  const [customLineItems, setCustomLineItems] = useState<Array<{ description: string; amount: string }>>([]);
+  const [isCompletionRecording, setIsCompletionRecording] = useState(false);
+  const [completionSpeechRecognition, setCompletionSpeechRecognition] = useState<any>(null);
 
   // Settings states
   const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials'>('profile');
@@ -170,7 +176,9 @@ const ContractorDashboard: React.FC = () => {
     googleBusinessUrl: '',
     licensed: false,
     insured: false,
-    afterHoursAvailable: false
+    afterHoursAvailable: false,
+    hourlyRate: '',
+    taxRate: ''
   });
 
   // Toast notification helper
@@ -944,19 +952,192 @@ const ContractorDashboard: React.FC = () => {
 
   const handleCompleteJob = (job: any) => {
     setJobToComplete(job);
-    // Pre-fill with booking price if available
+    // Pre-fill notes if the job already has notes
     setCompletionForm({
-      laborCost: job.price ? String(job.price) : '',
-      materialsCost: '',
-      taxRate: '0',
-      notes: '',
-      materials: ''
+      startTime: '',
+      endTime: '',
+      notes: job.notes || '',
+      beforePhotos: [],
+      afterPhotos: []
     });
+    setCompletionBeforePreview([]);
+    setCompletionAfterPreview([]);
+    setSelectedMaterials([]);
+    setCustomLineItems([]);
     setShowCompleteModal(true);
+  };
+
+  // Calculate labor cost based on start/end time and hourly rate
+  const calculateLaborCost = () => {
+    if (!completionForm.startTime || !completionForm.endTime || !profile?.hourlyRate) {
+      return 0;
+    }
+    const [startH, startM] = completionForm.startTime.split(':').map(Number);
+    const [endH, endM] = completionForm.endTime.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    const hoursWorked = (endMinutes - startMinutes) / 60;
+    return Math.max(0, hoursWorked * profile.hourlyRate);
+  };
+
+  // Calculate materials cost from selected materials
+  const calculateMaterialsCost = () => {
+    return selectedMaterials.reduce((total, item) => {
+      const material = materials.find(m => m.id === item.materialId);
+      if (material) {
+        return total + (material.price * item.quantity);
+      }
+      return total;
+    }, 0);
+  };
+
+  // Calculate custom line items total
+  const calculateCustomItemsTotal = () => {
+    return customLineItems.reduce((total, item) => {
+      return total + (parseFloat(item.amount) || 0);
+    }, 0);
+  };
+
+  // Calculate invoice totals
+  const calculateInvoiceTotals = () => {
+    const laborCost = calculateLaborCost();
+    const materialsCost = calculateMaterialsCost();
+    const customItemsCost = calculateCustomItemsTotal();
+    const subtotal = laborCost + materialsCost + customItemsCost;
+    const taxRate = profile?.taxRate || 0;
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+    return { laborCost, materialsCost, customItemsCost, subtotal, taxRate, taxAmount, total };
+  };
+
+  // Handle adding a material to the completion
+  const handleAddMaterial = (materialId: number) => {
+    if (selectedMaterials.some(m => m.materialId === materialId)) {
+      return; // Already added
+    }
+    setSelectedMaterials([...selectedMaterials, { materialId, quantity: 1 }]);
+  };
+
+  // Handle updating material quantity
+  const handleUpdateMaterialQuantity = (materialId: number, quantity: number) => {
+    setSelectedMaterials(selectedMaterials.map(m =>
+      m.materialId === materialId ? { ...m, quantity: Math.max(1, quantity) } : m
+    ));
+  };
+
+  // Handle removing a material
+  const handleRemoveMaterial = (materialId: number) => {
+    setSelectedMaterials(selectedMaterials.filter(m => m.materialId !== materialId));
+  };
+
+  // Handle adding a custom line item
+  const handleAddCustomItem = () => {
+    setCustomLineItems([...customLineItems, { description: '', amount: '' }]);
+  };
+
+  // Handle updating custom item
+  const handleUpdateCustomItem = (index: number, field: 'description' | 'amount', value: string) => {
+    setCustomLineItems(customLineItems.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // Handle removing custom item
+  const handleRemoveCustomItem = (index: number) => {
+    setCustomLineItems(customLineItems.filter((_, i) => i !== index));
+  };
+
+  // Voice-to-text for completion notes
+  const toggleCompletionVoiceRecording = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      showToast('Voice recognition is not supported in your browser', 'error');
+      return;
+    }
+
+    if (isCompletionRecording && completionSpeechRecognition) {
+      completionSpeechRecognition.stop();
+      setIsCompletionRecording(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setCompletionForm(prev => ({
+          ...prev,
+          notes: prev.notes + (prev.notes ? ' ' : '') + finalTranscript
+        }));
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsCompletionRecording(false);
+      showToast('Voice recognition error. Please try again.', 'error');
+    };
+
+    recognition.onend = () => {
+      setIsCompletionRecording(false);
+    };
+
+    recognition.start();
+    setCompletionSpeechRecognition(recognition);
+    setIsCompletionRecording(true);
+  };
+
+  // Handle completion photo uploads
+  const handleCompletionPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const resizedFiles: File[] = [];
+    const previews: string[] = [];
+
+    for (const file of files) {
+      const resized = await resizeImage(file, 800);
+      resizedFiles.push(resized);
+      previews.push(URL.createObjectURL(resized));
+    }
+
+    if (type === 'before') {
+      setCompletionForm(prev => ({ ...prev, beforePhotos: [...prev.beforePhotos, ...resizedFiles] }));
+      setCompletionBeforePreview(prev => [...prev, ...previews]);
+    } else {
+      setCompletionForm(prev => ({ ...prev, afterPhotos: [...prev.afterPhotos, ...resizedFiles] }));
+      setCompletionAfterPreview(prev => [...prev, ...previews]);
+    }
   };
 
   const submitJobCompletion = async () => {
     if (!jobToComplete) return;
+
+    const totals = calculateInvoiceTotals();
+
+    // Build materials description from selected materials
+    const materialsDescription = selectedMaterials.map(item => {
+      const material = materials.find(m => m.id === item.materialId);
+      return material ? `${item.quantity}x ${material.name}` : '';
+    }).filter(Boolean).join(', ');
+
+    // Build custom items description
+    const customItemsDescription = customLineItems
+      .filter(item => item.description && item.amount)
+      .map(item => `${item.description}: $${item.amount}`)
+      .join(', ');
+
+    const allMaterials = [materialsDescription, customItemsDescription].filter(Boolean).join('; ');
 
     try {
       const response = await fetch(`${API_BASE_URL}/bookings/${jobToComplete.id}/complete`, {
@@ -965,27 +1146,53 @@ const ContractorDashboard: React.FC = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          laborCost: parseFloat(completionForm.laborCost) || 0,
-          materialsCost: parseFloat(completionForm.materialsCost) || 0,
-          taxRate: parseFloat(completionForm.taxRate) || 0,
+          startTime: completionForm.startTime ? new Date(`${getLocalDateString()}T${completionForm.startTime}:00`).toISOString() : null,
+          endTime: completionForm.endTime ? new Date(`${getLocalDateString()}T${completionForm.endTime}:00`).toISOString() : null,
+          laborCost: totals.laborCost,
+          materialsCost: totals.materialsCost + totals.customItemsCost,
+          taxRate: totals.taxRate,
           notes: completionForm.notes,
-          materials: completionForm.materials
+          materials: allMaterials
         })
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // Upload photos if any
+        if (completionForm.beforePhotos.length > 0 || completionForm.afterPhotos.length > 0) {
+          const formData = new FormData();
+          formData.append('bookingId', String(jobToComplete.id));
+
+          if (completionForm.beforePhotos.length > 0) {
+            formData.set('photoType', 'before');
+            completionForm.beforePhotos.forEach(photo => formData.append('photos', photo));
+            await fetch(`${API_BASE_URL}/upload/job-photos`, { method: 'POST', body: formData });
+          }
+
+          if (completionForm.afterPhotos.length > 0) {
+            const afterFormData = new FormData();
+            afterFormData.append('bookingId', String(jobToComplete.id));
+            afterFormData.set('photoType', 'after');
+            completionForm.afterPhotos.forEach(photo => afterFormData.append('photos', photo));
+            await fetch(`${API_BASE_URL}/upload/job-photos`, { method: 'POST', body: afterFormData });
+          }
+        }
+
         showToast('Job marked as complete! Invoice generated.', 'success');
         setShowCompleteModal(false);
         setJobToComplete(null);
         setCompletionForm({
-          laborCost: '',
-          materialsCost: '',
-          taxRate: '0',
+          startTime: '',
+          endTime: '',
           notes: '',
-          materials: ''
+          beforePhotos: [],
+          afterPhotos: []
         });
+        setCompletionBeforePreview([]);
+        setCompletionAfterPreview([]);
+        setSelectedMaterials([]);
+        setCustomLineItems([]);
         fetchContractorData();
       } else {
         showToast(data.error || 'Failed to complete job', 'error');
@@ -3308,7 +3515,9 @@ const ContractorDashboard: React.FC = () => {
         googleBusinessUrl: profile.googleBusinessUrl || '',
         licensed: profile.licensed || false,
         insured: profile.insured || false,
-        afterHoursAvailable: profile.afterHoursAvailable || false
+        afterHoursAvailable: profile.afterHoursAvailable || false,
+        hourlyRate: profile.hourlyRate?.toString() || '',
+        taxRate: profile.taxRate?.toString() || ''
       });
     }
   }, [profile, activeSection]);
@@ -3387,7 +3596,9 @@ const ContractorDashboard: React.FC = () => {
           googleBusinessUrl: profileForm.googleBusinessUrl,
           licensed: profileForm.licensed,
           insured: profileForm.insured,
-          afterHoursAvailable: profileForm.afterHoursAvailable
+          afterHoursAvailable: profileForm.afterHoursAvailable,
+          hourlyRate: profileForm.hourlyRate ? parseFloat(profileForm.hourlyRate) : null,
+          taxRate: profileForm.taxRate ? parseFloat(profileForm.taxRate) : null
         })
       });
 
@@ -3880,6 +4091,62 @@ const ContractorDashboard: React.FC = () => {
         <p style={{ fontSize: '13px', color: '#64748b', marginTop: '8px', lineHeight: '1.5' }}>
           Add your Google Business Profile link so clients can read your reviews and find your business on Google Maps
         </p>
+      </div>
+
+      {/* Billing & Rates Section */}
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '12px' }}>
+          Billing & Rates
+        </label>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+          Set your default labor rate and tax rate. These will be used when completing jobs.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>
+              Hourly Labor Rate ($)
+            </label>
+            <input
+              type="number"
+              value={profileForm.hourlyRate}
+              onChange={(e) => setProfileForm({ ...profileForm, hourlyRate: e.target.value })}
+              placeholder="75.00"
+              step="0.01"
+              min="0"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '15px',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#64748b', marginBottom: '8px' }}>
+              Default Tax Rate (%)
+            </label>
+            <input
+              type="number"
+              value={profileForm.taxRate}
+              onChange={(e) => setProfileForm({ ...profileForm, taxRate: e.target.value })}
+              placeholder="6.0"
+              step="0.01"
+              min="0"
+              max="100"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '15px',
+                outline: 'none'
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       <div style={{ marginBottom: '24px' }}>
@@ -5074,7 +5341,7 @@ const ContractorDashboard: React.FC = () => {
             backgroundColor: 'white',
             borderRadius: '12px',
             width: '90%',
-            maxWidth: '500px',
+            maxWidth: '700px',
             maxHeight: '90vh',
             overflow: 'auto',
             padding: '32px'
@@ -5117,104 +5384,318 @@ const ContractorDashboard: React.FC = () => {
 
             {/* Form Fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Labor Cost */}
+              {/* Time Worked */}
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                  Labor Cost ($)
+                  Time Worked {profile?.hourlyRate && <span style={{ fontWeight: 'normal', color: '#64748b' }}>(${profile.hourlyRate}/hr)</span>}
                 </label>
-                <input
-                  type="number"
-                  value={completionForm.laborCost}
-                  onChange={(e) => setCompletionForm({ ...completionForm, laborCost: e.target.value })}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Start Time</label>
+                    <input
+                      type="time"
+                      value={completionForm.startTime}
+                      onChange={(e) => setCompletionForm({ ...completionForm, startTime: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>End Time</label>
+                    <input
+                      type="time"
+                      value={completionForm.endTime}
+                      onChange={(e) => setCompletionForm({ ...completionForm, endTime: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+                {completionForm.startTime && completionForm.endTime && (
+                  <p style={{ fontSize: '13px', color: '#10b981', marginTop: '8px', margin: '8px 0 0 0' }}>
+                    Labor: ${calculateLaborCost().toFixed(2)}
+                  </p>
+                )}
+                {!profile?.hourlyRate && (
+                  <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '8px', margin: '8px 0 0 0' }}>
+                    Set your hourly rate in Settings → Profile to auto-calculate labor costs
+                  </p>
+                )}
               </div>
 
-              {/* Materials Cost */}
+              {/* Materials from Library */}
+              {materials.length > 0 && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                    Materials Used
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddMaterial(parseInt(e.target.value));
+                        e.target.value = '';
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      marginBottom: '12px'
+                    }}
+                  >
+                    <option value="">Add material from library...</option>
+                    {materials.filter(m => !selectedMaterials.some(sm => sm.materialId === m.id)).map(material => (
+                      <option key={material.id} value={material.id}>
+                        {material.name} - ${material.price}/{material.unit}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Selected Materials */}
+                  {selectedMaterials.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {selectedMaterials.map(item => {
+                        const material = materials.find(m => m.id === item.materialId);
+                        if (!material) return null;
+                        return (
+                          <div key={item.materialId} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '8px 12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '6px'
+                          }}>
+                            <span style={{ flex: 1, fontSize: '14px' }}>{material.name}</span>
+                            <span style={{ fontSize: '13px', color: '#64748b' }}>${material.price}/{material.unit}</span>
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateMaterialQuantity(item.materialId, parseInt(e.target.value) || 1)}
+                              min="1"
+                              style={{
+                                width: '60px',
+                                padding: '4px 8px',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '4px',
+                                fontSize: '14px',
+                                textAlign: 'center'
+                              }}
+                            />
+                            <span style={{ fontSize: '14px', fontWeight: '500', minWidth: '60px', textAlign: 'right' }}>
+                              ${(material.price * item.quantity).toFixed(2)}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveMaterial(item.materialId)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Custom Line Items */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                  Materials Cost ($)
-                </label>
-                <input
-                  type="number"
-                  value={completionForm.materialsCost}
-                  onChange={(e) => setCompletionForm({ ...completionForm, materialsCost: e.target.value })}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                    Additional Charges
+                  </label>
+                  <button
+                    onClick={handleAddCustomItem}
+                    style={{
+                      padding: '4px 12px',
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Add Item
+                  </button>
+                </div>
+                {customLineItems.map((item, index) => (
+                  <div key={index} style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '8px',
+                    alignItems: 'center'
+                  }}>
+                    <input
+                      type="text"
+                      value={item.description}
+                      onChange={(e) => handleUpdateCustomItem(index, 'description', e.target.value)}
+                      placeholder="Description"
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '14px'
+                      }}
+                    />
+                    <div style={{ position: 'relative', width: '100px' }}>
+                      <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }}>$</span>
+                      <input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) => handleUpdateCustomItem(index, 'amount', e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 24px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleRemoveCustomItem(index)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
               </div>
 
-              {/* Tax Rate */}
+              {/* Before/After Photos */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                  Tax Rate (%)
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '12px' }}>
+                  Photos
                 </label>
-                <input
-                  type="number"
-                  value={completionForm.taxRate}
-                  onChange={(e) => setCompletionForm({ ...completionForm, taxRate: e.target.value })}
-                  placeholder="0"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {/* Before Photos */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>Before Photos</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleCompletionPhotoChange(e, 'before')}
+                      style={{ display: 'none' }}
+                      id="completion-before-photos"
+                    />
+                    <label
+                      htmlFor="completion-before-photos"
+                      style={{
+                        display: 'block',
+                        padding: '16px',
+                        border: '2px dashed #e2e8f0',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: '#f8fafc'
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', color: '#64748b' }}>Click to add photos</span>
+                    </label>
+                    {completionBeforePreview.length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        {completionBeforePreview.map((url, i) => (
+                          <img key={i} src={url} alt="Before" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* After Photos */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>After Photos</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handleCompletionPhotoChange(e, 'after')}
+                      style={{ display: 'none' }}
+                      id="completion-after-photos"
+                    />
+                    <label
+                      htmlFor="completion-after-photos"
+                      style={{
+                        display: 'block',
+                        padding: '16px',
+                        border: '2px dashed #e2e8f0',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: '#f8fafc'
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', color: '#64748b' }}>Click to add photos</span>
+                    </label>
+                    {completionAfterPreview.length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        {completionAfterPreview.map((url, i) => (
+                          <img key={i} src={url} alt="After" style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Materials Used */}
+              {/* Notes with Voice-to-Text */}
               <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                  Materials Used
-                </label>
-                <textarea
-                  value={completionForm.materials}
-                  onChange={(e) => setCompletionForm({ ...completionForm, materials: e.target.value })}
-                  placeholder="List materials used..."
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                    minHeight: '80px',
-                    fontFamily: 'inherit'
-                  }}
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                  Completion Notes
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                    Completion Notes
+                  </label>
+                  <button
+                    onClick={toggleCompletionVoiceRecording}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      backgroundColor: isCompletionRecording ? '#ef4444' : '#f1f5f9',
+                      color: isCompletionRecording ? 'white' : '#475569',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {isCompletionRecording ? '⏹ Stop' : '🎤 Voice'}
+                  </button>
+                </div>
+                {isCompletionRecording && (
+                  <div style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#fef2f2',
+                    borderRadius: '6px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{ width: '8px', height: '8px', backgroundColor: '#ef4444', borderRadius: '50%', animation: 'pulse 1s infinite' }} />
+                    <span style={{ fontSize: '13px', color: '#991b1b' }}>Recording... speak now</span>
+                  </div>
+                )}
                 <textarea
                   value={completionForm.notes}
                   onChange={(e) => setCompletionForm({ ...completionForm, notes: e.target.value })}
@@ -5234,32 +5715,43 @@ const ContractorDashboard: React.FC = () => {
               </div>
 
               {/* Invoice Preview */}
-              <div style={{
-                backgroundColor: '#f0fdf4',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid #bbf7d0'
-              }}>
-                <p style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#166534', fontSize: '14px' }}>
-                  Invoice Preview
-                </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
-                  <span>Labor:</span>
-                  <span>${parseFloat(completionForm.laborCost) || 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
-                  <span>Materials:</span>
-                  <span>${parseFloat(completionForm.materialsCost) || 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
-                  <span>Tax ({completionForm.taxRate}%):</span>
-                  <span>${(((parseFloat(completionForm.laborCost) || 0) + (parseFloat(completionForm.materialsCost) || 0)) * (parseFloat(completionForm.taxRate) || 0) / 100).toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', color: '#166534', borderTop: '1px solid #bbf7d0', paddingTop: '8px', marginTop: '8px' }}>
-                  <span>Total:</span>
-                  <span>${(((parseFloat(completionForm.laborCost) || 0) + (parseFloat(completionForm.materialsCost) || 0)) * (1 + (parseFloat(completionForm.taxRate) || 0) / 100)).toFixed(2)}</span>
-                </div>
-              </div>
+              {(() => {
+                const totals = calculateInvoiceTotals();
+                return (
+                  <div style={{
+                    backgroundColor: '#f0fdf4',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <p style={{ margin: '0 0 12px 0', fontWeight: '600', color: '#166534', fontSize: '14px' }}>
+                      Invoice Preview
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                      <span>Labor:</span>
+                      <span>${totals.laborCost.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                      <span>Materials:</span>
+                      <span>${totals.materialsCost.toFixed(2)}</span>
+                    </div>
+                    {totals.customItemsCost > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                        <span>Additional:</span>
+                        <span>${totals.customItemsCost.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#15803d', marginBottom: '4px' }}>
+                      <span>Tax ({totals.taxRate}%):</span>
+                      <span>${totals.taxAmount.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'bold', color: '#166534', borderTop: '1px solid #bbf7d0', paddingTop: '8px', marginTop: '8px' }}>
+                      <span>Total:</span>
+                      <span>${totals.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Actions */}

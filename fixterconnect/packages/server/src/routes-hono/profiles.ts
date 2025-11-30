@@ -271,7 +271,9 @@ profiles.put('/contractor/:id', async (c) => {
       licensed,
       insured,
       afterHoursAvailable,
-      speaksSpanish
+      speaksSpanish,
+      hourlyRate,
+      taxRate
     } = await c.req.json();
 
     const updateData: any = {};
@@ -288,6 +290,8 @@ profiles.put('/contractor/:id', async (c) => {
     if (insured !== undefined) updateData.insured = insured;
     if (afterHoursAvailable !== undefined) updateData.afterHoursAvailable = afterHoursAvailable;
     if (speaksSpanish !== undefined) updateData.speaksSpanish = speaksSpanish;
+    if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
+    if (taxRate !== undefined) updateData.taxRate = taxRate;
 
     const contractor = await prisma.contractor.update({
       where: { id: parseInt(id) },
