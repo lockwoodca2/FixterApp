@@ -952,19 +952,72 @@ const ContractorDashboard: React.FC = () => {
 
   const handleCompleteJob = (job: any) => {
     setJobToComplete(job);
-    // Pre-fill notes if the job already has notes
-    setCompletionForm({
-      startTime: '',
-      endTime: '',
-      notes: job.notes || '',
-      beforePhotos: [],
-      afterPhotos: []
-    });
+
+    // Check for saved draft
+    const savedDraft = localStorage.getItem(`completion-draft-${job.id}`);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        setCompletionForm({
+          startTime: draft.startTime || '',
+          endTime: draft.endTime || '',
+          notes: draft.notes || job.notes || '',
+          beforePhotos: [],
+          afterPhotos: []
+        });
+        setSelectedMaterials(draft.selectedMaterials || []);
+        setCustomLineItems(draft.customLineItems || []);
+      } catch (e) {
+        // If parsing fails, use defaults
+        setCompletionForm({
+          startTime: '',
+          endTime: '',
+          notes: job.notes || '',
+          beforePhotos: [],
+          afterPhotos: []
+        });
+        setSelectedMaterials([]);
+        setCustomLineItems([]);
+      }
+    } else {
+      // Pre-fill notes if the job already has notes
+      setCompletionForm({
+        startTime: '',
+        endTime: '',
+        notes: job.notes || '',
+        beforePhotos: [],
+        afterPhotos: []
+      });
+      setSelectedMaterials([]);
+      setCustomLineItems([]);
+    }
     setCompletionBeforePreview([]);
     setCompletionAfterPreview([]);
-    setSelectedMaterials([]);
-    setCustomLineItems([]);
     setShowCompleteModal(true);
+  };
+
+  // Save completion draft to localStorage
+  const saveCompletionDraft = () => {
+    if (!jobToComplete) return;
+
+    const draft = {
+      startTime: completionForm.startTime,
+      endTime: completionForm.endTime,
+      notes: completionForm.notes,
+      selectedMaterials: selectedMaterials,
+      customLineItems: customLineItems,
+      savedAt: new Date().toISOString()
+    };
+
+    localStorage.setItem(`completion-draft-${jobToComplete.id}`, JSON.stringify(draft));
+    showToast('Draft saved! You can return to complete this job later.', 'success');
+    setShowCompleteModal(false);
+    setJobToComplete(null);
+  };
+
+  // Clear completion draft from localStorage
+  const clearCompletionDraft = (jobId: number) => {
+    localStorage.removeItem(`completion-draft-${jobId}`);
   };
 
   // Calculate labor cost based on start/end time and hourly rate
@@ -1178,6 +1231,9 @@ const ContractorDashboard: React.FC = () => {
             await fetch(`${API_BASE_URL}/upload/job-photos`, { method: 'POST', body: afterFormData });
           }
         }
+
+        // Clear any saved draft for this job
+        clearCompletionDraft(jobToComplete.id);
 
         showToast('Job marked as complete! Invoice generated.', 'success');
         setShowCompleteModal(false);
@@ -5778,6 +5834,21 @@ const ContractorDashboard: React.FC = () => {
                 }}
               >
                 Cancel
+              </button>
+              <button
+                onClick={saveCompletionDraft}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'white',
+                  color: '#1e293b',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Save Draft
               </button>
               <button
                 onClick={submitJobCompletion}
