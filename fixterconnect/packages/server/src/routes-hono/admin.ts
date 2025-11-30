@@ -399,4 +399,76 @@ admin.delete('/admin/service-areas/:id', async (c) => {
   }
 });
 
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+// DELETE /admin/users/:type/:id - Delete a user (client or contractor)
+admin.delete('/admin/users/:type/:id', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { type, id } = c.req.param();
+    const userId = parseInt(id);
+
+    if (type === 'client') {
+      // Get the client to find the associated user
+      const client = await prisma.client.findUnique({
+        where: { id: userId },
+        include: { user: true }
+      });
+
+      if (!client) {
+        return c.json({
+          success: false,
+          error: 'Client not found'
+        }, 404);
+      }
+
+      // Delete the user (cascades to client due to schema relation)
+      await prisma.user.delete({
+        where: { id: client.userId }
+      });
+
+      return c.json({
+        success: true,
+        message: 'Client deleted successfully'
+      });
+    } else if (type === 'contractor') {
+      // Get the contractor to find the associated user
+      const contractor = await prisma.contractor.findUnique({
+        where: { id: userId },
+        include: { user: true }
+      });
+
+      if (!contractor) {
+        return c.json({
+          success: false,
+          error: 'Contractor not found'
+        }, 404);
+      }
+
+      // Delete the user (cascades to contractor due to schema relation)
+      await prisma.user.delete({
+        where: { id: contractor.userId }
+      });
+
+      return c.json({
+        success: true,
+        message: 'Contractor deleted successfully'
+      });
+    } else {
+      return c.json({
+        success: false,
+        error: 'Invalid user type. Must be "client" or "contractor"'
+      }, 400);
+    }
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to delete user'
+    }, 500);
+  }
+});
+
 export default admin;

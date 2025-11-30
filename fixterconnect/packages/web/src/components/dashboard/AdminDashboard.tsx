@@ -35,7 +35,8 @@ interface Language {
 type UserType = 'client' | 'contractor';
 
 interface User {
-  id: number;
+  id: string;
+  originalId: number;
   name: string;
   email: string;
   phone: string;
@@ -617,10 +618,23 @@ const AdminDashboard: React.FC = () => {
                         {user.status === 'active' ? 'SUSPEND' : 'ACTIVATE'}
                       </button>
                       <button
-                        onClick={() => {
-                          // TODO: Implement delete user API call with confirmation
+                        onClick={async () => {
                           if (window.confirm(`Are you sure you want to permanently delete ${user.name}? This action cannot be undone.`)) {
-                            alert(`Delete user: ${user.name}`);
+                            try {
+                              const response = await fetch(`${API_BASE_URL}/admin/users/${user.type}/${user.originalId}`, {
+                                method: 'DELETE'
+                              });
+                              const data = await response.json();
+                              if (data.success) {
+                                setUsers(users.filter(u => u.id !== user.id));
+                                alert('User deleted successfully');
+                              } else {
+                                alert(data.error || 'Failed to delete user');
+                              }
+                            } catch (error) {
+                              console.error('Delete user error:', error);
+                              alert('Failed to delete user');
+                            }
                           }
                         }}
                         style={{
