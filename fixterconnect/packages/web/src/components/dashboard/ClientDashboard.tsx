@@ -405,6 +405,25 @@ const ClientDashboard: React.FC = () => {
         >
           VIEW DETAILS
         </button>
+        <button
+          onClick={() => handleMessageProvider(service)}
+          style={{
+            padding: '12px 20px',
+            backgroundColor: 'white',
+            color: '#1e293b',
+            border: '2px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <MessageSquare size={16} />
+          SEND MESSAGE
+        </button>
         {showActions === 'upcoming' && (
           <button
             style={{
@@ -1205,6 +1224,51 @@ const ClientDashboard: React.FC = () => {
       console.error('Error accepting quote:', error);
       alert('An error occurred while accepting the quote.');
     }
+  };
+
+  const handleCancelService = async (service: any) => {
+    if (!service) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to cancel your ${service.service} appointment with ${service.provider} on ${service.date}?`
+    );
+    if (!confirmed) return;
+
+    try {
+      // Update booking status to CANCELLED
+      const response = await fetch(`${API_BASE_URL}/bookings/${service.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'CANCELLED' })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Service cancelled successfully.');
+        setShowDetailsModal(false);
+        setSelectedService(null);
+        // Refresh data to update the UI
+        await fetchClientData();
+      } else {
+        alert(data.error || 'Failed to cancel service. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error cancelling service:', error);
+      alert('An error occurred while cancelling the service.');
+    }
+  };
+
+  const handleReschedule = (service: any) => {
+    if (!service) return;
+
+    // For now, show an alert with instructions
+    // This could be expanded to a full reschedule modal in the future
+    alert(
+      `To reschedule your ${service.service} appointment, please contact ${service.provider} directly through the Messages section.`
+    );
   };
 
   const handleFlagMessage = (message: any) => {
@@ -2106,6 +2170,7 @@ const ClientDashboard: React.FC = () => {
                 justifyContent: 'flex-end'
               }}>
                 <button
+                  onClick={() => handleReschedule(selectedService)}
                   style={{
                     padding: '12px 24px',
                     backgroundColor: 'white',
@@ -2120,6 +2185,7 @@ const ClientDashboard: React.FC = () => {
                   RESCHEDULE
                 </button>
                 <button
+                  onClick={() => handleCancelService(selectedService)}
                   style={{
                     padding: '12px 24px',
                     backgroundColor: 'white',
