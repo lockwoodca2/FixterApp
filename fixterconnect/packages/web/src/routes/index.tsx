@@ -13,6 +13,7 @@ import ServicesList from '../pages/ServicesList';
 import SearchResults from '../pages/SearchResults';
 import ContractorsList from '../pages/ContractorsList';
 import ContractorDetails from '../pages/ContractorDetails';
+import BookingPage from '../pages/BookingPage';
 import NotFound from '../pages/NotFound';
 
 // Import dashboard components
@@ -37,6 +38,9 @@ const AppRoutes: React.FC = () => {
         <Route path="/contractors/:serviceId" element={<ContractorsList />} />
         <Route path="/contractor/:contractorId" element={<ContractorDetails />} />
       </Route>
+
+      {/* Custom booking page (standalone, no layout - has its own branding) */}
+      <Route path="/book/:slug" element={<BookingPage />} />
 
       {/* Protected dashboard routes with DashboardLayout */}
       <Route element={<DashboardLayout />}>

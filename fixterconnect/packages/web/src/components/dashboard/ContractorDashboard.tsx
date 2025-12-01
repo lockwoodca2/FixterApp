@@ -20,7 +20,9 @@ import {
   Navigation,
   ExternalLink,
   CreditCard,
-  Award
+  Award,
+  Copy,
+  XCircle
 } from 'react-feather';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -195,7 +197,7 @@ const ContractorDashboard: React.FC = () => {
   const [sendingQuote, setSendingQuote] = useState(false);
 
   // Settings states
-  const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials' | 'subscription'>('profile');
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials' | 'subscription' | 'booking-page'>('profile');
   const [materials, setMaterials] = useState<any[]>([]);
   const [allServices, setAllServices] = useState<any[]>([]);
   const [contractorServices, setContractorServices] = useState<number[]>([]);
@@ -227,6 +229,40 @@ const ContractorDashboard: React.FC = () => {
     hourlyRate: '',
     taxRate: ''
   });
+
+  // Custom Booking Page states
+  const [bookingPageSettings, setBookingPageSettings] = useState<{
+    enabled: boolean;
+    slug: string | null;
+    primaryColor: string | null;
+    accentColor: string | null;
+    tagline: string | null;
+    logo: string | null;
+    showReviews: boolean;
+    showPrices: boolean;
+    url: string | null;
+  }>({
+    enabled: false,
+    slug: null,
+    primaryColor: '#3b82f6',
+    accentColor: '#8b5cf6',
+    tagline: null,
+    logo: null,
+    showReviews: true,
+    showPrices: true,
+    url: null
+  });
+  const [bookingPageForm, setBookingPageForm] = useState({
+    slug: '',
+    primaryColor: '#3b82f6',
+    accentColor: '#8b5cf6',
+    tagline: '',
+    showReviews: true,
+    showPrices: true
+  });
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [slugChecking, setSlugChecking] = useState(false);
+  const [bookingPageSaving, setBookingPageSaving] = useState(false);
 
   // Stripe Connect states
   const [stripeStatus, setStripeStatus] = useState<{
@@ -4660,6 +4696,113 @@ const ContractorDashboard: React.FC = () => {
     }
   }, [user?.id]);
 
+  // Fetch booking page settings
+  const fetchBookingPageSettings = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractor/${user.id}/booking-page`);
+      const data = await response.json();
+
+      if (data.success) {
+        setBookingPageSettings(data.bookingPage);
+        setBookingPageForm({
+          slug: data.bookingPage.slug || '',
+          primaryColor: data.bookingPage.primaryColor || '#3b82f6',
+          accentColor: data.bookingPage.accentColor || '#8b5cf6',
+          tagline: data.bookingPage.tagline || '',
+          showReviews: data.bookingPage.showReviews !== false,
+          showPrices: data.bookingPage.showPrices !== false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching booking page settings:', error);
+    }
+  };
+
+  // Check slug availability
+  const checkSlugAvailability = async (slug: string) => {
+    if (!slug || slug.length < 3) {
+      setSlugAvailable(null);
+      return;
+    }
+
+    setSlugChecking(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/booking-page/check-slug`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, contractorId: user?.id })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setSlugAvailable(data.available);
+      }
+    } catch (error) {
+      console.error('Error checking slug:', error);
+    } finally {
+      setSlugChecking(false);
+    }
+  };
+
+  // Debounce slug check
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (bookingPageForm.slug && bookingPageForm.slug !== bookingPageSettings.slug) {
+        checkSlugAvailability(bookingPageForm.slug);
+      } else {
+        setSlugAvailable(null);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [bookingPageForm.slug]);
+
+  // Fetch booking page settings when tab is selected
+  useEffect(() => {
+    if (settingsTab === 'booking-page' && user?.id) {
+      fetchBookingPageSettings();
+    }
+  }, [settingsTab, user?.id]);
+
+  // Save booking page settings
+  const saveBookingPageSettings = async (enabled: boolean) => {
+    if (!user?.id) return;
+
+    setBookingPageSaving(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/contractor/${user.id}/booking-page`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled,
+          slug: bookingPageForm.slug || null,
+          primaryColor: bookingPageForm.primaryColor,
+          accentColor: bookingPageForm.accentColor,
+          tagline: bookingPageForm.tagline || null,
+          showReviews: bookingPageForm.showReviews,
+          showPrices: bookingPageForm.showPrices
+        })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setBookingPageSettings(data.bookingPage);
+        showToast(enabled ? 'Booking page enabled!' : 'Settings saved!', 'success');
+      } else if (data.code === 'PREMIUM_REQUIRED') {
+        setShowPremiumModal(true);
+        setPremiumFeatureTriggered('Custom Booking Page');
+      } else {
+        showToast(data.error || 'Failed to save settings', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving booking page:', error);
+      showToast('Failed to save settings', 'error');
+    } finally {
+      setBookingPageSaving(false);
+    }
+  };
+
   // Handle upgrade to premium
   const handleUpgradeSubscription = async () => {
     if (!user?.id) return;
@@ -5110,7 +5253,8 @@ const ContractorDashboard: React.FC = () => {
           { id: 'services' as const, label: 'Services' },
           { id: 'areas' as const, label: 'Service Areas' },
           { id: 'materials' as const, label: 'Materials Library' },
-          { id: 'subscription' as const, label: 'Subscription' }
+          { id: 'subscription' as const, label: 'Subscription' },
+          { id: 'booking-page' as const, label: 'Booking Page' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -5140,6 +5284,7 @@ const ContractorDashboard: React.FC = () => {
         {settingsTab === 'areas' && renderAreasTab()}
         {settingsTab === 'materials' && renderMaterialsTab()}
         {settingsTab === 'subscription' && renderSubscriptionTab()}
+        {settingsTab === 'booking-page' && renderBookingPageTab()}
       </div>
 
       {/* Material Modal */}
@@ -6190,6 +6335,347 @@ const ContractorDashboard: React.FC = () => {
               <p style={{ color: '#92400e', fontSize: '13px' }}>
                 Maximum 5 active jobs at a time, 5% platform fee on payments
               </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderBookingPageTab = () => {
+    const isPremium = subscription?.isPremium;
+    const baseUrl = window.location.origin;
+
+    return (
+      <div>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>Custom Booking Page</h3>
+        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+          Create a branded booking page for your clients to book appointments directly
+        </p>
+
+        {/* Premium Required Banner */}
+        {!isPremium && (
+          <div style={{
+            padding: '20px',
+            backgroundColor: '#f5f3ff',
+            borderRadius: '12px',
+            border: '2px solid #6366f1',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
+          }}>
+            <div style={{
+              padding: '12px',
+              backgroundColor: '#6366f1',
+              borderRadius: '10px'
+            }}>
+              <Award size={24} color="white" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>
+                Premium Feature
+              </h4>
+              <p style={{ fontSize: '14px', color: '#64748b' }}>
+                Custom booking pages are available exclusively for Premium subscribers
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setShowPremiumModal(true);
+                setPremiumFeatureTriggered('Custom Booking Page');
+              }}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#6366f1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Upgrade
+            </button>
+          </div>
+        )}
+
+        {/* Status Card */}
+        <div style={{
+          padding: '20px',
+          backgroundColor: bookingPageSettings.enabled ? '#ecfdf5' : '#f8fafc',
+          borderRadius: '12px',
+          border: `2px solid ${bookingPageSettings.enabled ? '#10b981' : '#e2e8f0'}`,
+          marginBottom: '24px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                backgroundColor: bookingPageSettings.enabled ? '#10b981' : '#94a3b8'
+              }} />
+              <div>
+                <p style={{ fontWeight: '600', color: '#1e293b' }}>
+                  {bookingPageSettings.enabled ? 'Booking Page Active' : 'Booking Page Inactive'}
+                </p>
+                {bookingPageSettings.url && bookingPageSettings.enabled && (
+                  <a
+                    href={`${baseUrl}${bookingPageSettings.url}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '14px', color: '#6366f1', textDecoration: 'underline' }}
+                  >
+                    {baseUrl}{bookingPageSettings.url}
+                  </a>
+                )}
+              </div>
+            </div>
+            {isPremium && (
+              <button
+                onClick={() => saveBookingPageSettings(!bookingPageSettings.enabled)}
+                disabled={bookingPageSaving || (!bookingPageSettings.enabled && !bookingPageForm.slug)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: bookingPageSettings.enabled ? '#ef4444' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: bookingPageSaving ? 'not-allowed' : 'pointer',
+                  opacity: bookingPageSaving || (!bookingPageSettings.enabled && !bookingPageForm.slug) ? 0.6 : 1
+                }}
+              >
+                {bookingPageSaving ? 'Saving...' : bookingPageSettings.enabled ? 'Disable' : 'Enable'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Settings Form */}
+        <div style={{
+          padding: '24px',
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          opacity: isPremium ? 1 : 0.6,
+          pointerEvents: isPremium ? 'auto' : 'none'
+        }}>
+          <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Page Settings</h4>
+
+          {/* Custom URL */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+              Custom URL
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#64748b', fontSize: '14px' }}>{baseUrl}/book/</span>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="text"
+                  value={bookingPageForm.slug}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                  placeholder="your-business-name"
+                  style={{
+                    width: '100%',
+                    padding: '10px 40px 10px 12px',
+                    border: `1px solid ${slugAvailable === false ? '#ef4444' : slugAvailable === true ? '#10b981' : '#e2e8f0'}`,
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+                {slugChecking && (
+                  <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '12px' }}>
+                    Checking...
+                  </span>
+                )}
+                {!slugChecking && slugAvailable === true && (
+                  <CheckCircle size={18} color="#10b981" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                )}
+                {!slugChecking && slugAvailable === false && (
+                  <XCircle size={18} color="#ef4444" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                )}
+              </div>
+            </div>
+            {slugAvailable === false && (
+              <p style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>This URL is already taken</p>
+            )}
+            <p style={{ color: '#64748b', fontSize: '12px', marginTop: '4px' }}>
+              Minimum 3 characters, letters, numbers, and hyphens only
+            </p>
+          </div>
+
+          {/* Tagline */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+              Tagline (optional)
+            </label>
+            <input
+              type="text"
+              value={bookingPageForm.tagline}
+              onChange={(e) => setBookingPageForm({ ...bookingPageForm, tagline: e.target.value })}
+              placeholder="e.g., Quality plumbing services you can trust"
+              maxLength={100}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                fontSize: '14px'
+              }}
+            />
+          </div>
+
+          {/* Colors */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+                Primary Color
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="color"
+                  value={bookingPageForm.primaryColor}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, primaryColor: e.target.value })}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <input
+                  type="text"
+                  value={bookingPageForm.primaryColor}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, primaryColor: e.target.value })}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '6px' }}>
+                Accent Color
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="color"
+                  value={bookingPageForm.accentColor}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, accentColor: e.target.value })}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <input
+                  type="text"
+                  value={bookingPageForm.accentColor}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, accentColor: e.target.value })}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Visibility Options */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '12px' }}>
+              Display Options
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={bookingPageForm.showReviews}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, showReviews: e.target.checked })}
+                  style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
+                />
+                <span style={{ fontSize: '14px' }}>Show reviews on booking page</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={bookingPageForm.showPrices}
+                  onChange={(e) => setBookingPageForm({ ...bookingPageForm, showPrices: e.target.checked })}
+                  style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
+                />
+                <span style={{ fontSize: '14px' }}>Show service prices on booking page</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <button
+            onClick={() => saveBookingPageSettings(bookingPageSettings.enabled)}
+            disabled={bookingPageSaving}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: bookingPageSaving ? 'not-allowed' : 'pointer',
+              opacity: bookingPageSaving ? 0.6 : 1
+            }}
+          >
+            {bookingPageSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+
+        {/* Preview */}
+        {bookingPageSettings.enabled && bookingPageSettings.url && (
+          <div style={{ marginTop: '24px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Share Your Booking Link</h4>
+            <div style={{
+              padding: '16px',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <code style={{ fontSize: '14px', color: '#1e293b' }}>
+                {baseUrl}{bookingPageSettings.url}
+              </code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${baseUrl}${bookingPageSettings.url}`);
+                  showToast('Link copied to clipboard!', 'success');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#6366f1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Copy size={16} />
+                Copy
+              </button>
             </div>
           </div>
         )}

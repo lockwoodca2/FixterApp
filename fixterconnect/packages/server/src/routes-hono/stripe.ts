@@ -1132,6 +1132,8 @@ stripe.post('/stripe/subscription/reactivate', async (c) => {
 
 // POST /api/stripe/webhook - Handle Stripe webhook events
 stripe.post('/stripe/webhook', async (c) => {
+  console.log('=== WEBHOOK RECEIVED ===');
+
   try {
     const prisma = c.get('prisma');
 
@@ -1143,6 +1145,9 @@ stripe.post('/stripe/webhook', async (c) => {
     const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
     const signature = c.req.header('stripe-signature');
 
+    console.log('Webhook signature present:', !!signature);
+    console.log('Webhook secret configured:', !!c.env.STRIPE_WEBHOOK_SECRET);
+
     if (!signature) {
       console.error('No Stripe signature found');
       return c.json({ error: 'No signature' }, 400);
@@ -1150,6 +1155,7 @@ stripe.post('/stripe/webhook', async (c) => {
 
     // Get raw body for signature verification
     const rawBody = await c.req.text();
+    console.log('Raw body length:', rawBody.length);
 
     let event: Stripe.Event;
 
@@ -1161,6 +1167,7 @@ stripe.post('/stripe/webhook', async (c) => {
           signature,
           c.env.STRIPE_WEBHOOK_SECRET
         );
+        console.log('Webhook signature verified successfully');
       } catch (err) {
         console.error('Webhook signature verification failed:', err);
         return c.json({ error: 'Invalid signature' }, 400);
@@ -1557,34 +1564,46 @@ async function handleCheckoutCompleted(
   prisma: any,
   session: Stripe.Checkout.Session
 ) {
+  console.log('=== HANDLING CHECKOUT COMPLETED ===');
+  console.log('Session ID:', session.id);
+  console.log('Session metadata:', JSON.stringify(session.metadata));
+
   const contractorId = session.metadata?.contractorId;
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
+
+  console.log('Extracted values:', { contractorId, customerId, subscriptionId });
 
   if (!contractorId) {
     console.log('Checkout session has no contractorId in metadata');
     return;
   }
 
-  // Update or create subscription record
-  await prisma.subscription.upsert({
-    where: { contractorId: parseInt(contractorId) },
-    create: {
-      contractorId: parseInt(contractorId),
-      tier: 'PREMIUM',
-      status: 'ACTIVE',
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscriptionId,
-    },
-    update: {
-      tier: 'PREMIUM',
-      status: 'ACTIVE',
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscriptionId,
-    }
-  });
+  try {
+    // Update or create subscription record
+    const result = await prisma.subscription.upsert({
+      where: { contractorId: parseInt(contractorId) },
+      create: {
+        contractorId: parseInt(contractorId),
+        tier: 'PREMIUM',
+        status: 'ACTIVE',
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+      },
+      update: {
+        tier: 'PREMIUM',
+        status: 'ACTIVE',
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscriptionId,
+      }
+    });
 
-  console.log(`Checkout completed for contractor ${contractorId}, upgraded to PREMIUM`);
+    console.log(`Checkout completed for contractor ${contractorId}, upgraded to PREMIUM`);
+    console.log('Upsert result:', JSON.stringify(result));
+  } catch (error) {
+    console.error('Error in handleCheckoutCompleted:', error);
+    throw error;
+  }
 }
 
 // Helper function to handle subscription payment failure
@@ -1614,5 +1633,109 @@ async function handleSubscriptionPaymentFailed(
 
   console.log(`Payment failed for contractor ${dbSubscription.contractorId}, status set to PAST_DUE`);
 }
+
+// POST /api/stripe/subscription/sync/:contractorId - Manually sync subscription from Stripe
+stripe.post('/stripe/subscription/sync/:contractorId', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = c.req.param();
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+      return c.json({
+        success: false,
+        error: 'Stripe is not configured'
+      }, 500);
+    }
+
+    const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
+
+    // Get contractor's subscription record
+    const subscription = await prisma.subscription.findUnique({
+      where: { contractorId: parseInt(contractorId) },
+    });
+
+    if (!subscription?.stripeCustomerId) {
+      return c.json({
+        success: false,
+        error: 'No Stripe customer found for this contractor'
+      }, 400);
+    }
+
+    // Fetch subscriptions from Stripe for this customer
+    const stripeSubscriptions = await stripeClient.subscriptions.list({
+      customer: subscription.stripeCustomerId,
+      status: 'all',
+      limit: 1,
+    });
+
+    if (stripeSubscriptions.data.length === 0) {
+      return c.json({
+        success: false,
+        error: 'No subscriptions found in Stripe for this customer',
+        customerId: subscription.stripeCustomerId,
+      }, 404);
+    }
+
+    const stripeSub = stripeSubscriptions.data[0];
+
+    // Map Stripe status to our status
+    let status: 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'TRIALING' | 'INCOMPLETE' = 'ACTIVE';
+    switch (stripeSub.status) {
+      case 'active':
+        status = 'ACTIVE';
+        break;
+      case 'past_due':
+        status = 'PAST_DUE';
+        break;
+      case 'canceled':
+        status = 'CANCELED';
+        break;
+      case 'trialing':
+        status = 'TRIALING';
+        break;
+      case 'incomplete':
+      case 'incomplete_expired':
+        status = 'INCOMPLETE';
+        break;
+      default:
+        status = 'ACTIVE';
+    }
+
+    // Update subscription record
+    const tier = (stripeSub.status === 'active' || stripeSub.status === 'trialing') ? 'PREMIUM' : 'FREE';
+    const subAny = stripeSub as any;
+
+    const updatedSubscription = await prisma.subscription.update({
+      where: { contractorId: parseInt(contractorId) },
+      data: {
+        stripeSubscriptionId: stripeSub.id,
+        stripePriceId: stripeSub.items.data[0]?.price.id,
+        tier,
+        status,
+        currentPeriodStart: subAny.current_period_start ? new Date(subAny.current_period_start * 1000) : null,
+        currentPeriodEnd: subAny.current_period_end ? new Date(subAny.current_period_end * 1000) : null,
+        cancelAtPeriodEnd: subAny.cancel_at_period_end || false,
+        canceledAt: subAny.canceled_at ? new Date(subAny.canceled_at * 1000) : null,
+      }
+    });
+
+    return c.json({
+      success: true,
+      message: `Subscription synced successfully. Tier: ${tier}, Status: ${status}`,
+      subscription: updatedSubscription,
+      stripeSubscription: {
+        id: stripeSub.id,
+        status: stripeSub.status,
+        currentPeriodEnd: subAny.current_period_end,
+      }
+    });
+  } catch (error) {
+    console.error('Sync subscription error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to sync subscription'
+    }, 500);
+  }
+});
 
 export default stripe;
