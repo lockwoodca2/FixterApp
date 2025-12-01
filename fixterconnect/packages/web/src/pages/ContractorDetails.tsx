@@ -13,9 +13,14 @@ import {
   Shield,
   ExternalLink,
   ChevronLeft,
-  X
+  X,
+  Mail,
+  Lock,
+  Phone,
+  User
 } from 'react-feather';
 import { useAuth } from '../context/AuthContext';
+import { ApiClient } from '@fixterconnect/core';
 import { API_BASE_URL } from '../config/api';
 
 // Helper to get local date string in YYYY-MM-DD format (avoids UTC conversion)
@@ -26,7 +31,7 @@ const getLocalDateString = (date: Date = new Date()) => {
 const ContractorDetails: React.FC = () => {
   const { contractorId } = useParams<{ contractorId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, login } = useAuth();
 
   const [contractor, setContractor] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +45,21 @@ const ContractorDetails: React.FC = () => {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [jobPhotos, setJobPhotos] = useState<any[]>([]);
+
+  // Inline auth form state
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('');
+  const [authFirstName, setAuthFirstName] = useState('');
+  const [authLastName, setAuthLastName] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authUsername, setAuthUsername] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [authSuccess, setAuthSuccess] = useState(false);
+
+  const apiClient = new ApiClient(API_BASE_URL);
 
   useEffect(() => {
     loadContractor();
@@ -266,6 +286,100 @@ const ContractorDetails: React.FC = () => {
     );
   };
 
+  // Reset auth form when switching modes
+  const resetAuthForm = () => {
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthConfirmPassword('');
+    setAuthFirstName('');
+    setAuthLastName('');
+    setAuthPhone('');
+    setAuthUsername('');
+    setAuthError('');
+    setAuthSuccess(false);
+  };
+
+  // Handle login submission
+  const handleAuthLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setIsAuthLoading(true);
+
+    try {
+      const loggedInUser = await login(authUsername, authPassword);
+      if (loggedInUser) {
+        // Check if user is a client (contractors can't book services)
+        if (loggedInUser.type === 'contractor') {
+          setAuthError('Contractors cannot book services. Please log in with a client account.');
+          setIsAuthLoading(false);
+          return;
+        }
+        setAuthSuccess(true);
+        // Auth successful - the modal will now show the booking form
+        resetAuthForm();
+      } else {
+        setAuthError('Invalid username or password');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setAuthError('An error occurred. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // Handle signup submission
+  const handleAuthSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setIsAuthLoading(true);
+
+    // Validation
+    if (authPassword !== authConfirmPassword) {
+      setAuthError('Passwords do not match');
+      setIsAuthLoading(false);
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      setAuthError('Password must be at least 6 characters');
+      setIsAuthLoading(false);
+      return;
+    }
+
+    try {
+      // Create the account as a client
+      const response = await apiClient.createAccount({
+        firstName: authFirstName,
+        lastName: authLastName,
+        email: authEmail,
+        phone: authPhone,
+        username: authUsername,
+        password: authPassword,
+        accountType: 'client'
+      });
+
+      if (response.success) {
+        // Now log them in automatically
+        const loggedInUser = await login(authUsername, authPassword);
+        if (loggedInUser) {
+          setAuthSuccess(true);
+          resetAuthForm();
+        } else {
+          setAuthError('Account created but login failed. Please try logging in.');
+          setAuthMode('login');
+        }
+      } else {
+        setAuthError(response.error || 'Failed to create account');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      setAuthError('An error occurred. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
   const getAvailableTimes = () => {
     let times = availableTimeSlots.length > 0 ? availableTimeSlots : [
       '8:00 AM',
@@ -365,6 +479,9 @@ const ContractorDetails: React.FC = () => {
   const renderBookingModal = () => {
     if (!showBookingModal || !contractor) return null;
 
+    // Check if user needs to authenticate
+    const needsAuth = !user || user.type === 'contractor';
+
     return (
       <div style={{
         position: 'fixed',
@@ -401,10 +518,13 @@ const ContractorDetails: React.FC = () => {
               color: '#1e293b',
               margin: 0
             }}>
-              Book with {contractor.name}
+              {needsAuth ? 'Sign in to book' : `Book with ${contractor.name}`}
             </h2>
             <button
-              onClick={() => setShowBookingModal(false)}
+              onClick={() => {
+                setShowBookingModal(false);
+                resetAuthForm();
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -416,6 +536,383 @@ const ContractorDetails: React.FC = () => {
             </button>
           </div>
 
+          {/* Auth Form - shown when not logged in */}
+          {needsAuth ? (
+            <>
+              {/* Auth Mode Tabs */}
+              <div style={{
+                display: 'flex',
+                gap: '0',
+                marginBottom: '24px',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                border: '2px solid #e2e8f0'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setAuthError('');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: authMode === 'login' ? '#667eea' : 'white',
+                    color: authMode === 'login' ? 'white' : '#64748b',
+                    border: 'none',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Log In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setAuthError('');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: authMode === 'signup' ? '#667eea' : 'white',
+                    color: authMode === 'signup' ? 'white' : '#64748b',
+                    border: 'none',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Sign Up
+                </button>
+              </div>
+
+              {/* Error Message */}
+              {authError && (
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                  fontSize: '14px'
+                }}>
+                  {authError}
+                </div>
+              )}
+
+              {/* Login Form */}
+              {authMode === 'login' ? (
+                <form onSubmit={handleAuthLogin}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#1e293b',
+                      marginBottom: '6px'
+                    }}>
+                      <User size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={authUsername}
+                      onChange={(e) => setAuthUsername(e.target.value)}
+                      required
+                      placeholder="Enter your username"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#1e293b',
+                      marginBottom: '6px'
+                    }}>
+                      <Lock size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      required
+                      placeholder="Enter your password"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isAuthLoading}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      backgroundColor: isAuthLoading ? '#94a3b8' : '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      cursor: isAuthLoading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isAuthLoading ? 'Logging in...' : 'Log In & Continue'}
+                  </button>
+                </form>
+              ) : (
+                /* Signup Form */
+                <form onSubmit={handleAuthSignup}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#1e293b',
+                        marginBottom: '6px'
+                      }}>
+                        First Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={authFirstName}
+                        onChange={(e) => setAuthFirstName(e.target.value)}
+                        required
+                        placeholder="First name"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '15px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#1e293b',
+                        marginBottom: '6px'
+                      }}>
+                        Last Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={authLastName}
+                        onChange={(e) => setAuthLastName(e.target.value)}
+                        required
+                        placeholder="Last name"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '15px'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#1e293b',
+                      marginBottom: '6px'
+                    }}>
+                      <Mail size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      required
+                      placeholder="your@email.com"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#1e293b',
+                      marginBottom: '6px'
+                    }}>
+                      <Phone size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                      Phone *
+                    </label>
+                    <input
+                      type="tel"
+                      value={authPhone}
+                      onChange={(e) => setAuthPhone(e.target.value)}
+                      required
+                      placeholder="(555) 123-4567"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#1e293b',
+                      marginBottom: '6px'
+                    }}>
+                      <User size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                      Username *
+                    </label>
+                    <input
+                      type="text"
+                      value={authUsername}
+                      onChange={(e) => setAuthUsername(e.target.value)}
+                      required
+                      placeholder="Choose a username"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '2px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#1e293b',
+                        marginBottom: '6px'
+                      }}>
+                        <Lock size={14} style={{ display: 'inline', marginRight: '6px' }} />
+                        Password *
+                      </label>
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        placeholder="Min 6 characters"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '15px'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#1e293b',
+                        marginBottom: '6px'
+                      }}>
+                        Confirm Password *
+                      </label>
+                      <input
+                        type="password"
+                        value={authConfirmPassword}
+                        onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                        required
+                        minLength={6}
+                        placeholder="Confirm password"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '15px'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isAuthLoading}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      backgroundColor: isAuthLoading ? '#94a3b8' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                      cursor: isAuthLoading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isAuthLoading ? 'Creating account...' : 'Sign Up & Continue'}
+                  </button>
+                </form>
+              )}
+
+              {/* Info about what they're booking */}
+              <div style={{
+                marginTop: '24px',
+                padding: '16px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <p style={{
+                  margin: 0,
+                  fontSize: '14px',
+                  color: '#64748b',
+                  textAlign: 'center'
+                }}>
+                  You're booking with <strong style={{ color: '#1e293b' }}>{contractor.name}</strong>
+                </p>
+              </div>
+            </>
+          ) : (
+            /* Booking Form - shown when logged in */
+            <>
           {/* Select Service */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{
@@ -647,6 +1144,8 @@ const ContractorDetails: React.FC = () => {
               {isSubmitting ? 'Submitting...' : 'Request Booking'}
             </button>
           </div>
+            </>
+          )}
         </div>
       </div>
     );
