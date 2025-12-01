@@ -4630,18 +4630,22 @@ const ContractorDashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
+        // Handle both nested (Hono) and flat (Express) API response formats
+        const sub = data.subscription || data;
+        const limits = data.limits || data;
+
         setSubscription({
-          tier: data.tier,
-          status: data.status,
-          isPremium: data.isPremium,
-          currentPeriodEnd: data.currentPeriodEnd,
-          cancelAtPeriodEnd: data.cancelAtPeriodEnd || false
+          tier: sub.tier || 'FREE',
+          status: sub.status || 'ACTIVE',
+          isPremium: sub.isPremium || false,
+          currentPeriodEnd: sub.currentPeriodEnd,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd || false
         });
         setSubscriptionLimits({
-          activeJobs: data.activeJobs,
-          maxActiveJobs: data.maxActiveJobs,
-          canCreateJob: data.canCreateJob,
-          platformFeePercent: data.platformFeePercent
+          activeJobs: limits.activeJobs || 0,
+          maxActiveJobs: limits.maxActiveJobs !== undefined ? limits.maxActiveJobs : 5,
+          canCreateJob: limits.canCreateJob !== undefined ? limits.canCreateJob : true,
+          platformFeePercent: limits.platformFeePercent || 5
         });
       }
     } catch (error) {
