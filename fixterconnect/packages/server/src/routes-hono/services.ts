@@ -166,6 +166,12 @@ services.get('/contractors', async (c) => {
         insured: true,
         afterHoursAvailable: true,
         createdAt: true,
+        subscription: {
+          select: {
+            tier: true,
+            status: true
+          }
+        },
         services: {
           select: {
             basePrice: true,
@@ -195,10 +201,27 @@ services.get('/contractors', async (c) => {
       ]
     });
 
+    // Sort contractors with premium subscriptions first
+    const sortedContractors = contractors.sort((a, b) => {
+      const aIsPremium = a.subscription?.tier === 'PREMIUM' && a.subscription?.status === 'ACTIVE';
+      const bIsPremium = b.subscription?.tier === 'PREMIUM' && b.subscription?.status === 'ACTIVE';
+
+      if (aIsPremium && !bIsPremium) return -1;
+      if (!aIsPremium && bIsPremium) return 1;
+      return 0; // Keep existing order for same tier
+    });
+
+    // Add isPremium flag to response and remove subscription details
+    const contractorsWithPremiumFlag = sortedContractors.map(c => ({
+      ...c,
+      isPremium: c.subscription?.tier === 'PREMIUM' && c.subscription?.status === 'ACTIVE',
+      subscription: undefined // Don't expose subscription details to clients
+    }));
+
     return c.json({
       success: true,
-      contractors,
-      count: contractors.length
+      contractors: contractorsWithPremiumFlag,
+      count: contractorsWithPremiumFlag.length
     });
   } catch (error) {
     console.error('Get all contractors error:', error);
@@ -257,6 +280,12 @@ services.get('/contractors/by-service/:id', async (c) => {
         insured: true,
         afterHoursAvailable: true,
         createdAt: true,
+        subscription: {
+          select: {
+            tier: true,
+            status: true
+          }
+        },
         services: {
           where: {
             serviceId: parseInt(id)
@@ -289,10 +318,27 @@ services.get('/contractors/by-service/:id', async (c) => {
       ]
     });
 
+    // Sort contractors with premium subscriptions first
+    const sortedContractors = contractors.sort((a, b) => {
+      const aIsPremium = a.subscription?.tier === 'PREMIUM' && a.subscription?.status === 'ACTIVE';
+      const bIsPremium = b.subscription?.tier === 'PREMIUM' && b.subscription?.status === 'ACTIVE';
+
+      if (aIsPremium && !bIsPremium) return -1;
+      if (!aIsPremium && bIsPremium) return 1;
+      return 0; // Keep existing order for same tier
+    });
+
+    // Add isPremium flag to response and remove subscription details
+    const contractorsWithPremiumFlag = sortedContractors.map(c => ({
+      ...c,
+      isPremium: c.subscription?.tier === 'PREMIUM' && c.subscription?.status === 'ACTIVE',
+      subscription: undefined // Don't expose subscription details to clients
+    }));
+
     return c.json({
       success: true,
-      contractors,
-      count: contractors.length
+      contractors: contractorsWithPremiumFlag,
+      count: contractorsWithPremiumFlag.length
     });
   } catch (error) {
     console.error('Get contractors by service error:', error);

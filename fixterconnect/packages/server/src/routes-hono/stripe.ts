@@ -245,7 +245,8 @@ stripe.get('/stripe/connect/dashboard/:contractorId', async (c) => {
 // PAYMENT PROCESSING ENDPOINTS
 // ============================================
 
-const PLATFORM_FEE_PERCENT = 5; // 5% platform fee
+const PLATFORM_FEE_FREE = 5; // 5% platform fee for free tier
+const PLATFORM_FEE_PREMIUM = 3; // 3% platform fee for premium tier
 
 // POST /api/stripe/payment/create-intent - Create a PaymentIntent for an invoice
 stripe.post('/stripe/payment/create-intent', async (c) => {
@@ -267,13 +268,17 @@ stripe.post('/stripe/payment/create-intent', async (c) => {
       }, 500);
     }
 
-    // Get invoice with booking and contractor details
+    // Get invoice with booking and contractor details (including subscription)
     const invoice = await prisma.invoice.findUnique({
       where: { id: parseInt(invoiceId) },
       include: {
         booking: {
           include: {
-            contractor: true,
+            contractor: {
+              include: {
+                subscription: true
+              }
+            },
             client: true,
             service: true
           }
@@ -325,19 +330,29 @@ stripe.post('/stripe/payment/create-intent', async (c) => {
         }, 400);
       }
 
+      // Determine fee rate based on subscription
+      const isPremium = contractor.subscription?.tier === 'PREMIUM' && contractor.subscription?.status === 'ACTIVE';
+      const feePercent = isPremium ? PLATFORM_FEE_PREMIUM : PLATFORM_FEE_FREE;
+
       // Return existing PaymentIntent client secret
       return c.json({
         success: true,
         clientSecret: existingIntent.client_secret,
         paymentIntentId: existingIntent.id,
         amount: invoice.totalAmount,
-        platformFee: Math.round(invoice.totalAmount * PLATFORM_FEE_PERCENT) / 100,
+        platformFee: Math.round(invoice.totalAmount * feePercent) / 100,
+        isPremium,
+        feePercent,
       });
     }
 
+    // Determine fee rate based on subscription
+    const isPremium = contractor.subscription?.tier === 'PREMIUM' && contractor.subscription?.status === 'ACTIVE';
+    const feePercent = isPremium ? PLATFORM_FEE_PREMIUM : PLATFORM_FEE_FREE;
+
     // Calculate amounts in cents (Stripe uses smallest currency unit)
     const amountInCents = Math.round(invoice.totalAmount * 100);
-    const platformFeeInCents = Math.round(amountInCents * PLATFORM_FEE_PERCENT / 100);
+    const platformFeeInCents = Math.round(amountInCents * feePercent / 100);
 
     // Create PaymentIntent with transfer to connected account
     const paymentIntent = await stripeClient.paymentIntents.create({
@@ -371,6 +386,8 @@ stripe.post('/stripe/payment/create-intent', async (c) => {
       paymentIntentId: paymentIntent.id,
       amount: invoice.totalAmount,
       platformFee: platformFeeInCents / 100,
+      isPremium,
+      feePercent,
     });
   } catch (error) {
     console.error('Create payment intent error:', error);
@@ -729,6 +746,387 @@ stripe.get('/stripe/earnings/:contractorId', async (c) => {
 });
 
 // ============================================
+// SUBSCRIPTION ENDPOINTS
+// ============================================
+
+const PREMIUM_PRICE_MONTHLY = 3999; // $39.99 in cents
+
+// POST /api/stripe/subscription/create-checkout - Create Stripe Checkout session for premium subscription
+stripe.post('/stripe/subscription/create-checkout', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = await c.req.json();
+
+    if (!contractorId) {
+      return c.json({
+        success: false,
+        error: 'Contractor ID is required'
+      }, 400);
+    }
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+      return c.json({
+        success: false,
+        error: 'Stripe is not configured'
+      }, 500);
+    }
+
+    const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
+
+    // Get contractor details
+    const contractor = await prisma.contractor.findUnique({
+      where: { id: parseInt(contractorId) },
+      include: {
+        subscription: true
+      }
+    });
+
+    if (!contractor) {
+      return c.json({
+        success: false,
+        error: 'Contractor not found'
+      }, 404);
+    }
+
+    // Check if already premium
+    if (contractor.subscription?.tier === 'PREMIUM' && contractor.subscription?.status === 'ACTIVE') {
+      return c.json({
+        success: false,
+        error: 'You already have an active premium subscription'
+      }, 400);
+    }
+
+    // Get or create Stripe customer
+    let customerId = contractor.subscription?.stripeCustomerId;
+
+    if (!customerId) {
+      const customer = await stripeClient.customers.create({
+        email: contractor.email || undefined,
+        name: contractor.name,
+        metadata: {
+          contractorId: contractorId.toString(),
+        },
+      });
+      customerId = customer.id;
+
+      // Create or update subscription record with customer ID
+      await prisma.subscription.upsert({
+        where: { contractorId: parseInt(contractorId) },
+        create: {
+          contractorId: parseInt(contractorId),
+          tier: 'FREE',
+          status: 'ACTIVE',
+          stripeCustomerId: customerId,
+        },
+        update: {
+          stripeCustomerId: customerId,
+        },
+      });
+    }
+
+    // Get or create the price for premium subscription
+    // In production, you'd have a fixed price ID from Stripe dashboard
+    let priceId = c.env.STRIPE_PREMIUM_PRICE_ID;
+
+    if (!priceId) {
+      // Create a price dynamically (in production, use a pre-created price)
+      const price = await stripeClient.prices.create({
+        unit_amount: PREMIUM_PRICE_MONTHLY,
+        currency: 'usd',
+        recurring: { interval: 'month' },
+        product_data: {
+          name: 'FixterConnect Premium',
+        },
+      });
+      priceId = price.id;
+    }
+
+    const baseUrl = c.req.header('origin') || 'http://localhost:3000';
+
+    // Create Checkout Session
+    const session = await stripeClient.checkout.sessions.create({
+      customer: customerId,
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      success_url: `${baseUrl}/contractor/dashboard?subscription=success`,
+      cancel_url: `${baseUrl}/contractor/dashboard?subscription=cancelled`,
+      metadata: {
+        contractorId: contractorId.toString(),
+      },
+      subscription_data: {
+        metadata: {
+          contractorId: contractorId.toString(),
+        },
+      },
+    });
+
+    return c.json({
+      success: true,
+      checkoutUrl: session.url,
+      sessionId: session.id,
+    });
+  } catch (error) {
+    console.error('Create subscription checkout error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create checkout session'
+    }, 500);
+  }
+});
+
+// GET /api/stripe/subscription/status/:contractorId - Get subscription status
+stripe.get('/stripe/subscription/status/:contractorId', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = c.req.param();
+
+    const contractor = await prisma.contractor.findUnique({
+      where: { id: parseInt(contractorId) },
+      include: {
+        subscription: true,
+        _count: {
+          select: {
+            bookings: {
+              where: {
+                status: {
+                  in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS']
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!contractor) {
+      return c.json({
+        success: false,
+        error: 'Contractor not found'
+      }, 404);
+    }
+
+    const subscription = contractor.subscription;
+    const isPremium = subscription?.tier === 'PREMIUM' && subscription?.status === 'ACTIVE';
+    const activeJobCount = contractor._count.bookings;
+
+    // Free tier limits
+    const FREE_JOB_LIMIT = 5;
+    const canCreateJob = isPremium || activeJobCount < FREE_JOB_LIMIT;
+
+    return c.json({
+      success: true,
+      subscription: {
+        tier: subscription?.tier || 'FREE',
+        status: subscription?.status || 'ACTIVE',
+        isPremium,
+        currentPeriodEnd: subscription?.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
+      },
+      limits: {
+        activeJobs: activeJobCount,
+        maxActiveJobs: isPremium ? null : FREE_JOB_LIMIT, // null = unlimited
+        canCreateJob,
+        platformFeePercent: isPremium ? 3 : 5, // 3% for premium, 5% for free
+      },
+      features: {
+        unlimitedJobs: isPremium,
+        priorityListing: isPremium,
+        advancedScheduling: isPremium,
+        reducedFees: isPremium,
+        customBookingPage: isPremium,
+        automatedReminders: isPremium,
+        teamManagement: isPremium,
+        accountingExport: isPremium,
+      }
+    });
+  } catch (error) {
+    console.error('Get subscription status error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get subscription status'
+    }, 500);
+  }
+});
+
+// POST /api/stripe/subscription/portal - Create customer portal session for managing subscription
+stripe.post('/stripe/subscription/portal', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = await c.req.json();
+
+    if (!contractorId) {
+      return c.json({
+        success: false,
+        error: 'Contractor ID is required'
+      }, 400);
+    }
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+      return c.json({
+        success: false,
+        error: 'Stripe is not configured'
+      }, 500);
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { contractorId: parseInt(contractorId) },
+    });
+
+    if (!subscription?.stripeCustomerId) {
+      return c.json({
+        success: false,
+        error: 'No billing account found. Please subscribe first.'
+      }, 400);
+    }
+
+    const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
+    const baseUrl = c.req.header('origin') || 'http://localhost:3000';
+
+    const session = await stripeClient.billingPortal.sessions.create({
+      customer: subscription.stripeCustomerId,
+      return_url: `${baseUrl}/contractor/dashboard?section=settings`,
+    });
+
+    return c.json({
+      success: true,
+      portalUrl: session.url,
+    });
+  } catch (error) {
+    console.error('Create portal session error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create portal session'
+    }, 500);
+  }
+});
+
+// POST /api/stripe/subscription/cancel - Cancel subscription at period end
+stripe.post('/stripe/subscription/cancel', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = await c.req.json();
+
+    if (!contractorId) {
+      return c.json({
+        success: false,
+        error: 'Contractor ID is required'
+      }, 400);
+    }
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+      return c.json({
+        success: false,
+        error: 'Stripe is not configured'
+      }, 500);
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { contractorId: parseInt(contractorId) },
+    });
+
+    if (!subscription?.stripeSubscriptionId) {
+      return c.json({
+        success: false,
+        error: 'No active subscription found'
+      }, 400);
+    }
+
+    const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
+
+    // Cancel at period end (user keeps access until billing period ends)
+    await stripeClient.subscriptions.update(subscription.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+
+    // Update local record
+    await prisma.subscription.update({
+      where: { contractorId: parseInt(contractorId) },
+      data: {
+        cancelAtPeriodEnd: true,
+        canceledAt: new Date(),
+      },
+    });
+
+    return c.json({
+      success: true,
+      message: 'Subscription will be cancelled at the end of the billing period',
+    });
+  } catch (error) {
+    console.error('Cancel subscription error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to cancel subscription'
+    }, 500);
+  }
+});
+
+// POST /api/stripe/subscription/reactivate - Reactivate a subscription that was set to cancel
+stripe.post('/stripe/subscription/reactivate', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = await c.req.json();
+
+    if (!contractorId) {
+      return c.json({
+        success: false,
+        error: 'Contractor ID is required'
+      }, 400);
+    }
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+      return c.json({
+        success: false,
+        error: 'Stripe is not configured'
+      }, 500);
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { contractorId: parseInt(contractorId) },
+    });
+
+    if (!subscription?.stripeSubscriptionId) {
+      return c.json({
+        success: false,
+        error: 'No subscription found'
+      }, 400);
+    }
+
+    const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
+
+    // Reactivate by removing cancel_at_period_end
+    await stripeClient.subscriptions.update(subscription.stripeSubscriptionId, {
+      cancel_at_period_end: false,
+    });
+
+    // Update local record
+    await prisma.subscription.update({
+      where: { contractorId: parseInt(contractorId) },
+      data: {
+        cancelAtPeriodEnd: false,
+        canceledAt: null,
+      },
+    });
+
+    return c.json({
+      success: true,
+      message: 'Subscription reactivated successfully',
+    });
+  } catch (error) {
+    console.error('Reactivate subscription error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to reactivate subscription'
+    }, 500);
+  }
+});
+
+// ============================================
 // WEBHOOK ENDPOINT
 // ============================================
 
@@ -798,6 +1196,36 @@ stripe.post('/stripe/webhook', async (c) => {
       case 'transfer.created': {
         const transfer = event.data.object as Stripe.Transfer;
         console.log(`Transfer created: ${transfer.id} for $${transfer.amount / 100}`);
+        break;
+      }
+
+      // Subscription events
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionUpdated(prisma, subscription);
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        await handleSubscriptionDeleted(prisma, subscription);
+        break;
+      }
+
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === 'subscription') {
+          await handleCheckoutCompleted(prisma, session);
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        if ((invoice as any).subscription) {
+          await handleSubscriptionPaymentFailed(prisma, invoice);
+        }
         break;
       }
 
@@ -1003,6 +1431,188 @@ async function handleAccountUpdated(
 
     console.log(`Updated Stripe status for contractor ${contractor.id}:`, updates);
   }
+}
+
+// Helper function to handle subscription updates
+async function handleSubscriptionUpdated(
+  prisma: any,
+  subscription: Stripe.Subscription
+) {
+  const contractorId = subscription.metadata?.contractorId;
+  const customerId = subscription.customer as string;
+
+  // Find subscription record by customer ID or contractor ID
+  let dbSubscription = await prisma.subscription.findFirst({
+    where: {
+      OR: [
+        { stripeCustomerId: customerId },
+        { stripeSubscriptionId: subscription.id },
+        ...(contractorId ? [{ contractorId: parseInt(contractorId) }] : [])
+      ]
+    }
+  });
+
+  if (!dbSubscription && contractorId) {
+    // Create subscription record if it doesn't exist
+    dbSubscription = await prisma.subscription.create({
+      data: {
+        contractorId: parseInt(contractorId),
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subscription.id,
+        tier: 'FREE',
+        status: 'ACTIVE',
+      }
+    });
+  }
+
+  if (!dbSubscription) {
+    console.log(`No subscription record found for Stripe subscription ${subscription.id}`);
+    return;
+  }
+
+  // Map Stripe status to our status
+  let status: 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'TRIALING' | 'INCOMPLETE' = 'ACTIVE';
+  switch (subscription.status) {
+    case 'active':
+      status = 'ACTIVE';
+      break;
+    case 'past_due':
+      status = 'PAST_DUE';
+      break;
+    case 'canceled':
+      status = 'CANCELED';
+      break;
+    case 'trialing':
+      status = 'TRIALING';
+      break;
+    case 'incomplete':
+    case 'incomplete_expired':
+      status = 'INCOMPLETE';
+      break;
+    default:
+      status = 'ACTIVE';
+  }
+
+  // Update subscription record
+  const subAny = subscription as any;
+  await prisma.subscription.update({
+    where: { id: dbSubscription.id },
+    data: {
+      stripeSubscriptionId: subscription.id,
+      stripePriceId: subscription.items.data[0]?.price.id,
+      tier: subscription.status === 'active' || subscription.status === 'trialing' ? 'PREMIUM' : dbSubscription.tier,
+      status,
+      currentPeriodStart: subAny.current_period_start ? new Date(subAny.current_period_start * 1000) : null,
+      currentPeriodEnd: subAny.current_period_end ? new Date(subAny.current_period_end * 1000) : null,
+      cancelAtPeriodEnd: subAny.cancel_at_period_end || false,
+      canceledAt: subAny.canceled_at ? new Date(subAny.canceled_at * 1000) : null,
+    }
+  });
+
+  console.log(`Updated subscription for contractor ${dbSubscription.contractorId}: tier=${status === 'ACTIVE' ? 'PREMIUM' : dbSubscription.tier}, status=${status}`);
+}
+
+// Helper function to handle subscription deletion
+async function handleSubscriptionDeleted(
+  prisma: any,
+  subscription: Stripe.Subscription
+) {
+  const customerId = subscription.customer as string;
+
+  // Find subscription record
+  const dbSubscription = await prisma.subscription.findFirst({
+    where: {
+      OR: [
+        { stripeCustomerId: customerId },
+        { stripeSubscriptionId: subscription.id }
+      ]
+    }
+  });
+
+  if (!dbSubscription) {
+    console.log(`No subscription record found for deleted subscription ${subscription.id}`);
+    return;
+  }
+
+  // Downgrade to free tier
+  await prisma.subscription.update({
+    where: { id: dbSubscription.id },
+    data: {
+      tier: 'FREE',
+      status: 'CANCELED',
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      canceledAt: new Date(),
+    }
+  });
+
+  console.log(`Subscription deleted for contractor ${dbSubscription.contractorId}, downgraded to FREE tier`);
+}
+
+// Helper function to handle checkout completion
+async function handleCheckoutCompleted(
+  prisma: any,
+  session: Stripe.Checkout.Session
+) {
+  const contractorId = session.metadata?.contractorId;
+  const customerId = session.customer as string;
+  const subscriptionId = session.subscription as string;
+
+  if (!contractorId) {
+    console.log('Checkout session has no contractorId in metadata');
+    return;
+  }
+
+  // Update or create subscription record
+  await prisma.subscription.upsert({
+    where: { contractorId: parseInt(contractorId) },
+    create: {
+      contractorId: parseInt(contractorId),
+      tier: 'PREMIUM',
+      status: 'ACTIVE',
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+    },
+    update: {
+      tier: 'PREMIUM',
+      status: 'ACTIVE',
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+    }
+  });
+
+  console.log(`Checkout completed for contractor ${contractorId}, upgraded to PREMIUM`);
+}
+
+// Helper function to handle subscription payment failure
+async function handleSubscriptionPaymentFailed(
+  prisma: any,
+  invoice: Stripe.Invoice
+) {
+  const customerId = invoice.customer as string;
+
+  // Find subscription record
+  const dbSubscription = await prisma.subscription.findFirst({
+    where: { stripeCustomerId: customerId }
+  });
+
+  if (!dbSubscription) {
+    console.log(`No subscription record found for customer ${customerId}`);
+    return;
+  }
+
+  // Update status to past_due
+  await prisma.subscription.update({
+    where: { id: dbSubscription.id },
+    data: {
+      status: 'PAST_DUE',
+    }
+  });
+
+  console.log(`Payment failed for contractor ${dbSubscription.contractorId}, status set to PAST_DUE`);
 }
 
 export default stripe;

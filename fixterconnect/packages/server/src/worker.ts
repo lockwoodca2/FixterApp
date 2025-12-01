@@ -9,6 +9,7 @@ export interface Env {
   JWT_SECRET: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PREMIUM_PRICE_ID?: string;
   R2_BUCKET: R2Bucket;
   R2_PUBLIC_URL: string;
 }

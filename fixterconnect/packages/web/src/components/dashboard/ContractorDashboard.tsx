@@ -19,11 +19,13 @@ import {
   Phone,
   Navigation,
   ExternalLink,
-  CreditCard
+  CreditCard,
+  Award
 } from 'react-feather';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import PremiumUpgradeModal from '../common/PremiumUpgradeModal';
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'earnings' | 'settings';
 
@@ -193,7 +195,7 @@ const ContractorDashboard: React.FC = () => {
   const [sendingQuote, setSendingQuote] = useState(false);
 
   // Settings states
-  const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials'>('profile');
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials' | 'subscription'>('profile');
   const [materials, setMaterials] = useState<any[]>([]);
   const [allServices, setAllServices] = useState<any[]>([]);
   const [contractorServices, setContractorServices] = useState<number[]>([]);
@@ -258,6 +260,24 @@ const ContractorDashboard: React.FC = () => {
     monthlyBreakdown: { [key: string]: number };
   } | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(false);
+
+  // Subscription states
+  const [subscription, setSubscription] = useState<{
+    tier: 'FREE' | 'PREMIUM';
+    status: string;
+    isPremium: boolean;
+    currentPeriodEnd?: string;
+    cancelAtPeriodEnd: boolean;
+  } | null>(null);
+  const [subscriptionLimits, setSubscriptionLimits] = useState<{
+    activeJobs: number;
+    maxActiveJobs: number | null;
+    canCreateJob: boolean;
+    platformFeePercent: number;
+  } | null>(null);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [premiumFeatureTriggered, setPremiumFeatureTriggered] = useState<string>('');
+  const [upgradingSubscription, setUpgradingSubscription] = useState(false);
 
   // Toast notification helper
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -4601,11 +4621,111 @@ const ContractorDashboard: React.FC = () => {
     }
   };
 
-  // Check for Stripe onboarding return
+  // Fetch subscription status
+  const fetchSubscription = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/stripe/subscription/status/${user.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setSubscription({
+          tier: data.tier,
+          status: data.status,
+          isPremium: data.isPremium,
+          currentPeriodEnd: data.currentPeriodEnd,
+          cancelAtPeriodEnd: data.cancelAtPeriodEnd || false
+        });
+        setSubscriptionLimits({
+          activeJobs: data.activeJobs,
+          maxActiveJobs: data.maxActiveJobs,
+          canCreateJob: data.canCreateJob,
+          platformFeePercent: data.platformFeePercent
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    }
+  };
+
+  // Fetch subscription on mount
+  useEffect(() => {
+    if (user?.id) {
+      fetchSubscription();
+    }
+  }, [user?.id]);
+
+  // Handle upgrade to premium
+  const handleUpgradeSubscription = async () => {
+    if (!user?.id) return;
+
+    try {
+      setUpgradingSubscription(true);
+      const response = await fetch(`${API_BASE_URL}/stripe/subscription/create-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user.id,
+          successUrl: `${window.location.origin}/contractor-dashboard?subscription=success`,
+          cancelUrl: `${window.location.origin}/contractor-dashboard?subscription=cancelled`
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        showToast(data.error || 'Failed to create checkout session', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      showToast('Failed to start upgrade process', 'error');
+    } finally {
+      setUpgradingSubscription(false);
+    }
+  };
+
+  // Handle manage subscription (open Stripe portal)
+  const handleManageSubscription = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/stripe/subscription/portal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractorId: user.id,
+          returnUrl: `${window.location.origin}/contractor-dashboard?tab=settings`
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.portalUrl) {
+        window.location.href = data.portalUrl;
+      } else {
+        showToast(data.error || 'Failed to open billing portal', 'error');
+      }
+    } catch (error) {
+      console.error('Error opening portal:', error);
+      showToast('Failed to open billing portal', 'error');
+    }
+  };
+
+  // Trigger premium modal for feature gate
+  const triggerPremiumModal = (featureName: string) => {
+    setPremiumFeatureTriggered(featureName);
+    setShowPremiumModal(true);
+  };
+
+  // Check for Stripe onboarding return and subscription status
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const stripeOnboarding = urlParams.get('stripe_onboarding');
     const stripeRefresh = urlParams.get('stripe_refresh');
+    const subscriptionStatus = urlParams.get('subscription');
 
     if (stripeOnboarding === 'complete') {
       showToast('Stripe account setup complete!', 'success');
@@ -4625,6 +4745,16 @@ const ContractorDashboard: React.FC = () => {
     } else if (stripeRefresh === 'true') {
       showToast('Please complete your Stripe setup', 'info');
       setActiveSection('settings');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (subscriptionStatus === 'success') {
+      showToast('Welcome to Premium! Your subscription is now active.', 'success');
+      setActiveSection('settings');
+      setSettingsTab('subscription');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh subscription status
+      fetchSubscription();
+    } else if (subscriptionStatus === 'cancelled') {
+      showToast('Subscription upgrade was cancelled', 'info');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [user?.id]);
@@ -4970,12 +5100,13 @@ const ContractorDashboard: React.FC = () => {
       </p>
 
       {/* Tabs */}
-      <div style={{ borderBottom: '2px solid #e2e8f0', marginBottom: '24px', display: 'flex', gap: '32px' }}>
+      <div style={{ borderBottom: '2px solid #e2e8f0', marginBottom: '24px', display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
         {[
           { id: 'profile' as const, label: 'Profile' },
           { id: 'services' as const, label: 'Services' },
           { id: 'areas' as const, label: 'Service Areas' },
-          { id: 'materials' as const, label: 'Materials Library' }
+          { id: 'materials' as const, label: 'Materials Library' },
+          { id: 'subscription' as const, label: 'Subscription' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -5004,6 +5135,7 @@ const ContractorDashboard: React.FC = () => {
         {settingsTab === 'services' && renderServicesTab()}
         {settingsTab === 'areas' && renderAreasTab()}
         {settingsTab === 'materials' && renderMaterialsTab()}
+        {settingsTab === 'subscription' && renderSubscriptionTab()}
       </div>
 
       {/* Material Modal */}
@@ -5853,6 +5985,202 @@ const ContractorDashboard: React.FC = () => {
       )}
     </div>
   );
+
+  const renderSubscriptionTab = () => {
+    const isPremium = subscription?.isPremium;
+    const premiumFeatures = [
+      { title: 'Unlimited Jobs', description: 'No limit on active bookings', included: true },
+      { title: 'Reduced Fees', description: 'Only 3% platform fee (vs 5%)', included: true },
+      { title: 'Priority Listing', description: 'Appear higher in search results', included: true },
+      { title: 'Advanced Scheduling', description: 'Drag-to-reorder, bulk scheduling', included: true },
+      { title: 'Automated Reminders', description: 'SMS/email reminders to clients', included: true },
+      { title: 'Team Management', description: 'Add employees under your account', included: true },
+      { title: 'Accounting Export', description: 'QuickBooks integration & reports', included: true },
+    ];
+
+    return (
+      <div>
+        <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>Subscription Plan</h3>
+        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+          Manage your subscription and billing
+        </p>
+
+        {/* Current Plan Card */}
+        <div style={{
+          padding: '24px',
+          borderRadius: '12px',
+          border: isPremium ? '2px solid #6366f1' : '2px solid #e2e8f0',
+          backgroundColor: isPremium ? '#f5f3ff' : '#f8fafc',
+          marginBottom: '24px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                padding: '12px',
+                borderRadius: '10px',
+                backgroundColor: isPremium ? '#6366f1' : '#e2e8f0'
+              }}>
+                <Award size={24} color={isPremium ? 'white' : '#64748b'} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '2px' }}>
+                  {isPremium ? 'Premium Plan' : 'Free Plan'}
+                </h4>
+                <p style={{ fontSize: '14px', color: '#64748b' }}>
+                  {isPremium ? '$39.99/month' : '$0/month'}
+                </p>
+              </div>
+            </div>
+            {isPremium && (
+              <span style={{
+                padding: '6px 12px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}>
+                Active
+              </span>
+            )}
+          </div>
+
+          {/* Usage Stats */}
+          {subscriptionLimits && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '16px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ padding: '16px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Active Jobs</p>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b' }}>
+                  {subscriptionLimits.activeJobs}
+                  <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 'normal' }}>
+                    /{subscriptionLimits.maxActiveJobs || '∞'}
+                  </span>
+                </p>
+              </div>
+              <div style={{ padding: '16px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Platform Fee</p>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b' }}>
+                  {subscriptionLimits.platformFeePercent}%
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Renewal Info */}
+          {isPremium && subscription?.currentPeriodEnd && (
+            <div style={{
+              padding: '12px',
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <p style={{ fontSize: '14px', color: '#64748b' }}>
+                {subscription.cancelAtPeriodEnd ? (
+                  <>Subscription ends on <strong>{new Date(subscription.currentPeriodEnd).toLocaleDateString()}</strong></>
+                ) : (
+                  <>Next billing date: <strong>{new Date(subscription.currentPeriodEnd).toLocaleDateString()}</strong></>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
+            {isPremium ? (
+              <button
+                onClick={handleManageSubscription}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'white',
+                  color: '#1e293b',
+                  border: '2px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Manage Billing
+              </button>
+            ) : (
+              <button
+                onClick={handleUpgradeSubscription}
+                disabled={upgradingSubscription}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: upgradingSubscription ? 'not-allowed' : 'pointer',
+                  opacity: upgradingSubscription ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Award size={18} />
+                {upgradingSubscription ? 'Loading...' : 'Upgrade to Premium - $39.99/mo'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Premium Features */}
+        {!isPremium && (
+          <div style={{
+            padding: '24px',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            backgroundColor: 'white'
+          }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '16px' }}>
+              Premium Features
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {premiumFeatures.map((feature, index) => (
+                <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <CheckCircle size={20} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <p style={{ fontWeight: '600', color: '#1e293b', fontSize: '14px' }}>{feature.title}</p>
+                    <p style={{ color: '#64748b', fontSize: '13px' }}>{feature.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Free Plan Limits */}
+        {!isPremium && (
+          <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            backgroundColor: '#fef3c7',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}>
+            <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <p style={{ fontWeight: '600', color: '#92400e', fontSize: '14px' }}>Free Plan Limitations</p>
+              <p style={{ color: '#92400e', fontSize: '13px' }}>
+                Maximum 5 active jobs at a time, 5% platform fee on payments
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -7985,6 +8313,18 @@ const ContractorDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Premium Upgrade Modal */}
+      <PremiumUpgradeModal
+        isOpen={showPremiumModal}
+        onClose={() => {
+          setShowPremiumModal(false);
+          setPremiumFeatureTriggered('');
+        }}
+        onUpgrade={handleUpgradeSubscription}
+        featureTriggered={premiumFeatureTriggered}
+        isLoading={upgradingSubscription}
+      />
     </div>
   );
 };

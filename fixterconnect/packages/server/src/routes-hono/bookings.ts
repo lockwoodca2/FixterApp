@@ -33,9 +33,23 @@ bookings.post('/bookings', async (c) => {
       }, 400);
     }
 
-    // Verify contractor exists
+    // Verify contractor exists and check subscription limits
     const contractor = await prisma.contractor.findUnique({
-      where: { id: contractorId }
+      where: { id: contractorId },
+      include: {
+        subscription: true,
+        _count: {
+          select: {
+            bookings: {
+              where: {
+                status: {
+                  in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS']
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
     if (!contractor) {
@@ -43,6 +57,21 @@ bookings.post('/bookings', async (c) => {
         success: false,
         error: 'Contractor not found'
       }, 404);
+    }
+
+    // Check job limit for free tier contractors
+    const FREE_JOB_LIMIT = 5;
+    const isPremium = contractor.subscription?.tier === 'PREMIUM' && contractor.subscription?.status === 'ACTIVE';
+    const activeJobCount = contractor._count.bookings;
+
+    if (!isPremium && activeJobCount >= FREE_JOB_LIMIT) {
+      return c.json({
+        success: false,
+        error: 'Job limit reached. Upgrade to Premium for unlimited jobs.',
+        code: 'JOB_LIMIT_REACHED',
+        limit: FREE_JOB_LIMIT,
+        currentCount: activeJobCount
+      }, 403);
     }
 
     // Verify client exists
@@ -193,6 +222,47 @@ bookings.post('/bookings/manual', async (c) => {
         success: false,
         error: 'Missing required fields'
       }, 400);
+    }
+
+    // Check contractor subscription limits
+    const contractor = await prisma.contractor.findUnique({
+      where: { id: contractorId },
+      include: {
+        subscription: true,
+        _count: {
+          select: {
+            bookings: {
+              where: {
+                status: {
+                  in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS']
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!contractor) {
+      return c.json({
+        success: false,
+        error: 'Contractor not found'
+      }, 404);
+    }
+
+    // Check job limit for free tier contractors
+    const FREE_JOB_LIMIT = 5;
+    const isPremium = contractor.subscription?.tier === 'PREMIUM' && contractor.subscription?.status === 'ACTIVE';
+    const activeJobCount = contractor._count.bookings;
+
+    if (!isPremium && activeJobCount >= FREE_JOB_LIMIT) {
+      return c.json({
+        success: false,
+        error: 'Job limit reached. Upgrade to Premium for unlimited jobs.',
+        code: 'JOB_LIMIT_REACHED',
+        limit: FREE_JOB_LIMIT,
+        currentCount: activeJobCount
+      }, 403);
     }
 
     // Parse date without timezone shift
