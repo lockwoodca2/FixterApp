@@ -196,6 +196,14 @@ const ContractorDashboard: React.FC = () => {
   const [quoteNotes, setQuoteNotes] = useState('');
   const [sendingQuote, setSendingQuote] = useState(false);
 
+  // Report Client Modal states
+  const [showReportClientModal, setShowReportClientModal] = useState(false);
+  const [reportClientJob, setReportClientJob] = useState<any>(null);
+  const [reportClientReason, setReportClientReason] = useState('');
+  const [reportClientDescription, setReportClientDescription] = useState('');
+  const [reportClientSubmitting, setReportClientSubmitting] = useState(false);
+  const [reportClientSuccess, setReportClientSuccess] = useState(false);
+
   // Settings states
   const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials' | 'subscription' | 'booking-page'>('profile');
   const [materials, setMaterials] = useState<any[]>([]);
@@ -1707,6 +1715,62 @@ const ContractorDashboard: React.FC = () => {
     return datePart === today;
   };
 
+  // Handle Report Client
+  const handleReportClient = (job: any) => {
+    setReportClientJob(job);
+    setReportClientReason('');
+    setReportClientDescription('');
+    setReportClientSuccess(false);
+    setShowReportClientModal(true);
+  };
+
+  const handleReportClientSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || !reportClientJob) {
+      showToast('Unable to submit report', 'error');
+      return;
+    }
+
+    if (!reportClientReason || !reportClientDescription.trim()) {
+      showToast('Please select a reason and provide a description', 'error');
+      return;
+    }
+
+    setReportClientSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'USER_PROFILE',
+          reporterType: 'CONTRACTOR',
+          reporterId: String(user.id),
+          reportedUserId: String(reportClientJob.clientId),
+          reportedUserType: 'CLIENT',
+          bookingId: String(reportClientJob.id),
+          reason: reportClientReason,
+          description: reportClientDescription
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setReportClientSuccess(true);
+      } else {
+        showToast(data.error || 'Failed to submit report', 'error');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      showToast('An error occurred while submitting the report', 'error');
+    } finally {
+      setReportClientSubmitting(false);
+    }
+  };
+
   const menuItems = [
     { id: 'today' as ActiveSection, label: "Today's Jobs", icon: Calendar },
     { id: 'messages' as ActiveSection, label: 'Messages', icon: MessageSquare },
@@ -2532,20 +2596,40 @@ const ContractorDashboard: React.FC = () => {
               <p style={{ color: '#64748b', marginBottom: '12px' }}>
                 <strong>Amount:</strong> ${job.price || 'N/A'}
               </p>
-              <button
-                onClick={() => handleDeleteJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}>
-                Delete
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => handleReportClient(job)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: 'white',
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                  <Flag size={14} />
+                  Report Client
+                </button>
+                <button
+                  onClick={() => handleDeleteJob(job.id, `${job.client.firstName} ${job.client.lastName} - ${job.service.name}`)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}>
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -8826,6 +8910,198 @@ const ContractorDashboard: React.FC = () => {
         featureTriggered={premiumFeatureTriggered}
         isLoading={upgradingSubscription}
       />
+
+      {/* Report Client Modal */}
+      {showReportClientModal && reportClientJob && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            {reportClientSuccess ? (
+              <div style={{ textAlign: 'center', padding: '24px' }}>
+                <CheckCircle size={48} color="#10b981" style={{ marginBottom: '16px' }} />
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+                  Report Submitted
+                </h3>
+                <p style={{ color: '#64748b', marginBottom: '24px' }}>
+                  Thank you for your report. Our team will review it and take appropriate action.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowReportClientModal(false);
+                    setReportClientSuccess(false);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#4f46e5',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                    Report Client
+                  </h3>
+                  <button
+                    onClick={() => setShowReportClientModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={24} color="#64748b" />
+                  </button>
+                </div>
+
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  marginBottom: '20px'
+                }}>
+                  <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>
+                    <strong>Client:</strong> {reportClientJob.client?.firstName} {reportClientJob.client?.lastName}
+                  </p>
+                  <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '14px' }}>
+                    <strong>Job:</strong> {reportClientJob.service?.name} - {formatDateLocal(reportClientJob.scheduledDate)}
+                  </p>
+                </div>
+
+                <form onSubmit={handleReportClientSubmit}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                      Reason for Report *
+                    </label>
+                    <select
+                      value={reportClientReason}
+                      onChange={(e) => setReportClientReason(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="">Select a reason</option>
+                      <option value="no_show">No Show</option>
+                      <option value="harassment">Harassment or Abuse</option>
+                      <option value="unsafe_conditions">Unsafe Work Conditions</option>
+                      <option value="payment_issue">Payment Issue</option>
+                      <option value="fraud">Fraud or Scam</option>
+                      <option value="property_damage">Property Damage</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                      Description *
+                    </label>
+                    <textarea
+                      value={reportClientDescription}
+                      onChange={(e) => setReportClientDescription(e.target.value)}
+                      required
+                      rows={4}
+                      placeholder="Please provide details about the issue..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{
+                    backgroundColor: '#fef3c7',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}>
+                    <AlertTriangle size={20} color="#92400e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ color: '#92400e', margin: 0, fontSize: '13px' }}>
+                      False reports may result in account suspension. Please only report genuine issues.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowReportClientModal(false)}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        backgroundColor: 'white',
+                        color: '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={reportClientSubmitting}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: reportClientSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: reportClientSubmitting ? 0.7 : 1
+                      }}
+                    >
+                      {reportClientSubmitting ? 'Submitting...' : 'Submit Report'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

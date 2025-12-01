@@ -38,6 +38,22 @@ const ClientDashboard: React.FC = () => {
   const [flagReason, setFlagReason] = useState('');
   const [flagDetails, setFlagDetails] = useState('');
 
+  // Report Issue state
+  const [showReportIssueModal, setShowReportIssueModal] = useState(false);
+  const [reportIssueService, setReportIssueService] = useState<any>(null);
+  const [reportIssueReason, setReportIssueReason] = useState('');
+  const [reportIssueDescription, setReportIssueDescription] = useState('');
+  const [reportIssueSubmitting, setReportIssueSubmitting] = useState(false);
+  const [reportIssueSuccess, setReportIssueSuccess] = useState(false);
+
+  // Dispute Payment state
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeInvoice, setDisputeInvoice] = useState<any>(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeDescription, setDisputeDescription] = useState('');
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const [disputeSuccess, setDisputeSuccess] = useState(false);
+
   // Messages state
   const [showChatModal, setShowChatModal] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<any>(null);
@@ -261,6 +277,118 @@ const ClientDashboard: React.FC = () => {
     }
   };
 
+  // Handle Report Issue
+  const handleReportIssue = (service: any) => {
+    setReportIssueService(service);
+    setReportIssueReason('');
+    setReportIssueDescription('');
+    setReportIssueSuccess(false);
+    setShowReportIssueModal(true);
+  };
+
+  const handleReportIssueSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || !reportIssueService) {
+      alert('Unable to submit report');
+      return;
+    }
+
+    if (!reportIssueReason || !reportIssueDescription.trim()) {
+      alert('Please select a reason and provide a description');
+      return;
+    }
+
+    setReportIssueSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'BOOKING_ISSUE',
+          reporterType: 'CLIENT',
+          reporterId: String(user.id),
+          reportedUserId: String(reportIssueService.providerId),
+          reportedUserType: 'CONTRACTOR',
+          bookingId: String(reportIssueService.id),
+          reason: reportIssueReason,
+          description: reportIssueDescription
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setReportIssueSuccess(true);
+      } else {
+        alert(data.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('An error occurred while submitting the report');
+    } finally {
+      setReportIssueSubmitting(false);
+    }
+  };
+
+  // Handle Dispute Payment
+  const handleDisputePayment = (invoice: any) => {
+    setDisputeInvoice(invoice);
+    setDisputeReason('');
+    setDisputeDescription('');
+    setDisputeSuccess(false);
+    setShowDisputeModal(true);
+  };
+
+  const handleDisputeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || !disputeInvoice) {
+      alert('Unable to submit dispute');
+      return;
+    }
+
+    if (!disputeReason || !disputeDescription.trim()) {
+      alert('Please select a reason and provide a description');
+      return;
+    }
+
+    setDisputeSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'PAYMENT_DISPUTE',
+          reporterType: 'CLIENT',
+          reporterId: String(user.id),
+          reportedUserId: String(disputeInvoice.contractorId),
+          reportedUserType: 'CONTRACTOR',
+          bookingId: String(disputeInvoice.bookingId),
+          reason: disputeReason,
+          description: `Invoice #${disputeInvoice.invoiceNumber} - Amount: $${disputeInvoice.amount}\n\n${disputeDescription}`
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setDisputeSuccess(true);
+      } else {
+        alert(data.error || 'Failed to submit dispute');
+      }
+    } catch (error) {
+      console.error('Error submitting dispute:', error);
+      alert('An error occurred while submitting the dispute');
+    } finally {
+      setDisputeSubmitting(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!profile) return;
 
@@ -481,6 +609,25 @@ const ClientDashboard: React.FC = () => {
                 DOWNLOAD INVOICE
               </button>
             )}
+            <button
+              onClick={() => handleReportIssue(service)}
+              style={{
+                padding: '12px 20px',
+                backgroundColor: 'white',
+                color: '#64748b',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Flag size={16} />
+              REPORT ISSUE
+            </button>
           </>
         )}
       </div>
@@ -1776,24 +1923,45 @@ const ClientDashboard: React.FC = () => {
                         ${invoice.amount}
                       </p>
                     </div>
-                    <button
-                      onClick={() => {
-                        // TODO: Implement download invoice
-                        alert(`Download invoice ${invoice.invoiceNumber}`);
-                      }}
-                      style={{
-                        padding: '12px 20px',
-                        backgroundColor: 'white',
-                        color: '#1e293b',
-                        border: '2px solid #e2e8f0',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      DOWNLOAD
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          // TODO: Implement download invoice
+                          alert(`Download invoice ${invoice.invoiceNumber}`);
+                        }}
+                        style={{
+                          padding: '12px 20px',
+                          backgroundColor: 'white',
+                          color: '#1e293b',
+                          border: '2px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        DOWNLOAD
+                      </button>
+                      <button
+                        onClick={() => handleDisputePayment(invoice)}
+                        style={{
+                          padding: '12px 20px',
+                          backgroundColor: 'white',
+                          color: '#64748b',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Flag size={14} />
+                        DISPUTE
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2617,6 +2785,422 @@ const ClientDashboard: React.FC = () => {
             setSelectedInvoice(null);
           }}
         />
+      )}
+
+      {/* Report Issue Modal */}
+      {showReportIssueModal && reportIssueService && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            {reportIssueSuccess ? (
+              <div style={{ textAlign: 'center', padding: '24px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  backgroundColor: '#dcfce7',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <Flag size={24} color="#10b981" />
+                </div>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+                  Report Submitted
+                </h3>
+                <p style={{ color: '#64748b', marginBottom: '24px' }}>
+                  Thank you for your report. Our team will review it and take appropriate action.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowReportIssueModal(false);
+                    setReportIssueSuccess(false);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#4f46e5',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                    Report an Issue
+                  </h3>
+                  <button
+                    onClick={() => setShowReportIssueModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={24} color="#64748b" />
+                  </button>
+                </div>
+
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  marginBottom: '20px'
+                }}>
+                  <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>
+                    <strong>Service:</strong> {reportIssueService.service}
+                  </p>
+                  <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '14px' }}>
+                    <strong>Provider:</strong> {reportIssueService.provider}
+                  </p>
+                  <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '14px' }}>
+                    <strong>Date:</strong> {reportIssueService.date}
+                  </p>
+                </div>
+
+                <form onSubmit={handleReportIssueSubmit}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                      Type of Issue *
+                    </label>
+                    <select
+                      value={reportIssueReason}
+                      onChange={(e) => setReportIssueReason(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="">Select an issue type</option>
+                      <option value="quality">Poor Quality Work</option>
+                      <option value="incomplete">Incomplete Work</option>
+                      <option value="no_show">Contractor No-Show</option>
+                      <option value="property_damage">Property Damage</option>
+                      <option value="overcharge">Overcharged</option>
+                      <option value="unprofessional">Unprofessional Behavior</option>
+                      <option value="safety">Safety Concern</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                      Describe the Issue *
+                    </label>
+                    <textarea
+                      value={reportIssueDescription}
+                      onChange={(e) => setReportIssueDescription(e.target.value)}
+                      required
+                      rows={4}
+                      placeholder="Please provide details about what went wrong..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{
+                    backgroundColor: '#fef3c7',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}>
+                    <AlertTriangle size={20} color="#92400e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ color: '#92400e', margin: 0, fontSize: '13px' }}>
+                      False reports may result in account suspension. Please only report genuine issues.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowReportIssueModal(false)}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        backgroundColor: 'white',
+                        color: '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={reportIssueSubmitting}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: reportIssueSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: reportIssueSubmitting ? 0.7 : 1
+                      }}
+                    >
+                      {reportIssueSubmitting ? 'Submitting...' : 'Submit Report'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Payment Modal */}
+      {showDisputeModal && disputeInvoice && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            {disputeSuccess ? (
+              <div style={{ textAlign: 'center', padding: '24px' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  backgroundColor: '#dcfce7',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <Flag size={24} color="#10b981" />
+                </div>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+                  Dispute Submitted
+                </h3>
+                <p style={{ color: '#64748b', marginBottom: '24px' }}>
+                  Your payment dispute has been submitted. Our team will review it and contact you within 2-3 business days.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowDisputeModal(false);
+                    setDisputeSuccess(false);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#4f46e5',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                    Dispute Payment
+                  </h3>
+                  <button
+                    onClick={() => setShowDisputeModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px'
+                    }}
+                  >
+                    <X size={24} color="#64748b" />
+                  </button>
+                </div>
+
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  marginBottom: '20px'
+                }}>
+                  <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>
+                    <strong>Invoice:</strong> #{disputeInvoice.invoiceNumber}
+                  </p>
+                  <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '14px' }}>
+                    <strong>Service:</strong> {disputeInvoice.service}
+                  </p>
+                  <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '14px' }}>
+                    <strong>Provider:</strong> {disputeInvoice.provider}
+                  </p>
+                  <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '14px' }}>
+                    <strong>Amount:</strong> ${disputeInvoice.amount}
+                  </p>
+                </div>
+
+                <form onSubmit={handleDisputeSubmit}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                      Reason for Dispute *
+                    </label>
+                    <select
+                      value={disputeReason}
+                      onChange={(e) => setDisputeReason(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="">Select a reason</option>
+                      <option value="overcharge">Charged More Than Agreed</option>
+                      <option value="service_not_received">Service Not Received</option>
+                      <option value="partial_service">Partial Service Delivered</option>
+                      <option value="quality_issue">Quality Issue</option>
+                      <option value="unauthorized_charge">Unauthorized Charge</option>
+                      <option value="duplicate_charge">Duplicate Charge</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                      Describe the Issue *
+                    </label>
+                    <textarea
+                      value={disputeDescription}
+                      onChange={(e) => setDisputeDescription(e.target.value)}
+                      required
+                      rows={4}
+                      placeholder="Please provide details about why you're disputing this payment..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{
+                    backgroundColor: '#fef3c7',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}>
+                    <AlertTriangle size={20} color="#92400e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <p style={{ color: '#92400e', margin: 0, fontSize: '13px' }}>
+                      Disputes are reviewed by our team. False disputes may affect your account standing.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowDisputeModal(false)}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        backgroundColor: 'white',
+                        color: '#374151',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={disputeSubmitting}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: disputeSubmitting ? 'not-allowed' : 'pointer',
+                        opacity: disputeSubmitting ? 0.7 : 1
+                      }}
+                    >
+                      {disputeSubmitting ? 'Submitting...' : 'Submit Dispute'}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

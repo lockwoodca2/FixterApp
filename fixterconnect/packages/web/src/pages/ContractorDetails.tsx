@@ -17,7 +17,8 @@ import {
   Mail,
   Lock,
   Phone,
-  User
+  User,
+  Flag
 } from 'react-feather';
 import { useAuth } from '../context/AuthContext';
 import { ApiClient } from '@fixterconnect/core';
@@ -58,6 +59,13 @@ const ContractorDetails: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
+
+  // Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
 
   const apiClient = new ApiClient(API_BASE_URL);
 
@@ -475,6 +483,284 @@ const ContractorDetails: React.FC = () => {
     }
 
     return days;
+  };
+
+  // Handle report submission
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || userType !== 'client') {
+      alert('You must be logged in as a client to submit a report.');
+      return;
+    }
+
+    if (!reportReason || !reportDescription.trim()) {
+      alert('Please select a reason and provide a description.');
+      return;
+    }
+
+    setReportSubmitting(true);
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'USER_PROFILE',
+          reporterType: 'CLIENT',
+          reporterId: String(user.id),
+          reportedUserId: String(contractor?.id || contractorId),
+          reportedUserType: 'contractor',
+          reason: reportReason,
+          description: reportDescription
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setReportSuccess(true);
+      } else {
+        alert(data.error || 'Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('An error occurred while submitting the report');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  // Render report modal
+  const renderReportModal = () => {
+    if (!showReportModal || !contractor) return null;
+
+    const needsAuth = !user || userType !== 'client';
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          width: '100%',
+          maxWidth: '500px',
+          maxHeight: '90vh',
+          overflow: 'auto'
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '24px',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                Report Contractor
+              </h2>
+              <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0' }}>
+                Report an issue with {contractor.name}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setShowReportModal(false);
+                setReportReason('');
+                setReportDescription('');
+                setReportSuccess(false);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px'
+              }}
+            >
+              <X size={24} color="#64748b" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '24px' }}>
+            {reportSuccess ? (
+              <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                <div style={{
+                  width: '64px',
+                  height: '64px',
+                  backgroundColor: '#dcfce7',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <CheckCircle size={32} color="#16a34a" />
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 8px' }}>
+                  Report Submitted
+                </h3>
+                <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px' }}>
+                  Thank you for your report. Our team will review it and take appropriate action.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowReportModal(false);
+                    setReportReason('');
+                    setReportDescription('');
+                    setReportSuccess(false);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#1e293b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : needsAuth ? (
+              <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                <Flag size={48} color="#94a3b8" style={{ marginBottom: '16px' }} />
+                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 8px' }}>
+                  Sign in Required
+                </h3>
+                <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 24px' }}>
+                  You must be logged in as a client to report a contractor.
+                </p>
+                <button
+                  onClick={() => navigate('/login')}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sign In
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleReportSubmit}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '8px'
+                  }}>
+                    Reason for Report
+                  </label>
+                  <select
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '14px',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <option value="">Select a reason</option>
+                    <option value="Fake or misleading profile">Fake or misleading profile</option>
+                    <option value="Inappropriate behavior">Inappropriate behavior</option>
+                    <option value="Poor quality work">Poor quality work</option>
+                    <option value="Unprofessional conduct">Unprofessional conduct</option>
+                    <option value="Harassment or threats">Harassment or threats</option>
+                    <option value="Suspected fraud">Suspected fraud</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    marginBottom: '8px'
+                  }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={reportDescription}
+                    onChange={(e) => setReportDescription(e.target.value)}
+                    required
+                    placeholder="Please provide details about your report..."
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '14px',
+                      minHeight: '120px',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#fef3c7',
+                  borderRadius: '8px',
+                  marginBottom: '24px'
+                }}>
+                  <p style={{ fontSize: '13px', color: '#92400e', margin: 0 }}>
+                    False reports may result in account suspension. Please only submit genuine concerns.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={reportSubmitting}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    backgroundColor: reportSubmitting ? '#94a3b8' : '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: reportSubmitting ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {reportSubmitting ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderBookingModal = () => {
@@ -1540,6 +1826,26 @@ const ContractorDetails: React.FC = () => {
                   Google Reviews
                 </button>
               </div>
+
+              {/* Report Link */}
+              <button
+                onClick={() => setShowReportModal(true)}
+                style={{
+                  marginTop: '16px',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: '#94a3b8',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Flag size={14} />
+                Report this contractor
+              </button>
             </div>
           </div>
         </div>
@@ -1933,6 +2239,9 @@ const ContractorDetails: React.FC = () => {
 
       {/* Booking Modal */}
       {renderBookingModal()}
+
+      {/* Report Modal */}
+      {renderReportModal()}
     </div>
   );
 };
