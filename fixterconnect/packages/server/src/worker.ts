@@ -71,6 +71,7 @@ import uploadsRoutes from './routes-hono/uploads.js';
 import materialsRoutes from './routes-hono/materials.js';
 import timeSlotsRoutes from './routes-hono/timeSlots.js';
 import languagesRoutes from './routes-hono/languages.js';
+import stripeRoutes from './routes-hono/stripe.js';
 
 // Register routes
 app.route('/api', authRoutes);
@@ -86,6 +87,7 @@ app.route('/api', availabilityRoutes);
 app.route('/api/time-slots', timeSlotsRoutes);
 app.route('/api', uploadsRoutes);
 app.route('/api', languagesRoutes);
+app.route('/api', stripeRoutes);
 
 // Global error handler
 app.onError((err, c) => {

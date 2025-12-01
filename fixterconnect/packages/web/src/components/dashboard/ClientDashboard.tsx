@@ -2537,16 +2537,21 @@ const ClientDashboard: React.FC = () => {
       )}
 
       {/* Stripe Payment Modal */}
-      <StripePaymentModal
-        invoice={selectedInvoice}
-        onClose={() => {
-          setShowPaymentModal(false);
-          setSelectedInvoice(null);
-        }}
-        onSuccess={() => {
-          // TODO: Refresh invoices from API after successful payment
-        }}
-      />
+      {showPaymentModal && (
+        <StripePaymentModal
+          invoice={selectedInvoice}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setSelectedInvoice(null);
+          }}
+          onSuccess={() => {
+            // Refresh invoices and other data after successful payment
+            fetchClientData();
+            setShowPaymentModal(false);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
     </div>
   );
 };

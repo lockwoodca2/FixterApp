@@ -99,6 +99,11 @@ model Contractor {
   isActive         Boolean  @default(true) @map("is_active")
   isBanned         Boolean  @default(false) @map("is_banned")
   suspendedUntil   DateTime? @map("suspended_until")
+  // Stripe Connect fields
+  stripeAccountId          String?  @unique @map("stripe_account_id") // Stripe Connect Express account ID
+  stripeOnboardingComplete Boolean  @default(false) @map("stripe_onboarding_complete")
+  stripeChargesEnabled     Boolean  @default(false) @map("stripe_charges_enabled")
+  stripePayoutsEnabled     Boolean  @default(false) @map("stripe_payouts_enabled")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -385,6 +390,8 @@ model Invoice {
   status          InvoiceStatus  @default(PENDING)
   dueDate         DateTime?      @map("due_date")
   paidAt          DateTime?      @map("paid_at")
+  // Stripe fields
+  stripePaymentIntentId String?  @unique @map("stripe_payment_intent_id")
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
@@ -410,6 +417,10 @@ model Payment {
   paymentMethod     String        @map("payment_method")
   stripePaymentId   String?       @unique @map("stripe_payment_id")
   stripePaymentIntent String?     @unique @map("stripe_payment_intent")
+  // Stripe Connect fields
+  platformFee       Float?        @map("platform_fee")     // 5% platform fee amount
+  contractorPayout  Float?        @map("contractor_payout") // Amount going to contractor (amount - platformFee)
+  stripeTransferId  String?       @unique @map("stripe_transfer_id") // Transfer to contractor's connected account
   status            PaymentStatus @default(PENDING)
   paidAt            DateTime?     @map("paid_at")
   createdAt         DateTime      @default(now()) @map("created_at")

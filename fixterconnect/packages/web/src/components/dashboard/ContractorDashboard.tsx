@@ -17,7 +17,9 @@ import {
   CheckCircle,
   Trash2,
   Phone,
-  Navigation
+  Navigation,
+  ExternalLink,
+  CreditCard
 } from 'react-feather';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -216,6 +218,16 @@ const ContractorDashboard: React.FC = () => {
     hourlyRate: '',
     taxRate: ''
   });
+
+  // Stripe Connect states
+  const [stripeStatus, setStripeStatus] = useState<{
+    hasAccount: boolean;
+    onboardingComplete: boolean;
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+    stripeAccountId?: string;
+  } | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
 
   // Toast notification helper
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -3853,6 +3865,34 @@ const ContractorDashboard: React.FC = () => {
     }
   }, [activeSection, user?.id]);
 
+  // Check for Stripe onboarding return
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeOnboarding = urlParams.get('stripe_onboarding');
+    const stripeRefresh = urlParams.get('stripe_refresh');
+
+    if (stripeOnboarding === 'complete') {
+      showToast('Stripe account setup complete!', 'success');
+      setActiveSection('settings');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh Stripe status
+      if (user?.id) {
+        fetch(`${API_BASE_URL}/stripe/connect/status/${user.id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              setStripeStatus(data.status);
+            }
+          });
+      }
+    } else if (stripeRefresh === 'true') {
+      showToast('Please complete your Stripe setup', 'info');
+      setActiveSection('settings');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [user?.id]);
+
   // Populate profile form when navigating to settings (only on initial load or section change)
   const [settingsInitialized, setSettingsInitialized] = useState(false);
   useEffect(() => {
@@ -3933,6 +3973,17 @@ const ContractorDashboard: React.FC = () => {
       if (contractorLanguagesData.success) {
         setContractorLanguages(contractorLanguagesData.languages.map((l: any) => l.id));
       }
+
+      // Load Stripe Connect status
+      try {
+        const stripeResponse = await fetch(`${API_BASE_URL}/stripe/connect/status/${user.id}`);
+        const stripeData = await stripeResponse.json();
+        if (stripeData.success) {
+          setStripeStatus(stripeData.status);
+        }
+      } catch (stripeError) {
+        console.error('Error loading Stripe status:', stripeError);
+      }
     } catch (error) {
       console.error('Error loading settings data:', error);
     }
@@ -3978,6 +4029,55 @@ const ContractorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error saving profile:', error);
       showToast('Failed to save profile', 'error');
+    }
+  };
+
+  // Stripe Connect handlers
+  const handleStripeOnboard = async () => {
+    if (!user?.id) return;
+
+    setStripeLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/stripe/connect/onboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractorId: user.id })
+      });
+
+      const data = await response.json();
+      if (data.success && data.url) {
+        // Redirect to Stripe onboarding
+        window.location.href = data.url;
+      } else {
+        showToast(data.error || 'Failed to start Stripe onboarding', 'error');
+      }
+    } catch (error) {
+      console.error('Error starting Stripe onboarding:', error);
+      showToast('Failed to connect to Stripe', 'error');
+    } finally {
+      setStripeLoading(false);
+    }
+  };
+
+  const handleStripeDashboard = async () => {
+    if (!user?.id) return;
+
+    setStripeLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/stripe/connect/dashboard/${user.id}`);
+      const data = await response.json();
+
+      if (data.success && data.url) {
+        // Open Stripe dashboard in new tab
+        window.open(data.url, '_blank');
+      } else {
+        showToast(data.error || 'Failed to open Stripe dashboard', 'error');
+      }
+    } catch (error) {
+      console.error('Error opening Stripe dashboard:', error);
+      showToast('Failed to open Stripe dashboard', 'error');
+    } finally {
+      setStripeLoading(false);
     }
   };
 
@@ -4555,6 +4655,173 @@ const ContractorDashboard: React.FC = () => {
               }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Payment Setup (Stripe Connect) Section */}
+      <div style={{ marginBottom: '24px' }}>
+        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '12px' }}>
+          <CreditCard size={18} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
+          Payment Setup
+        </label>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+          Connect your bank account to receive payments from clients. A 5% platform fee applies to all transactions.
+        </p>
+
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0'
+        }}>
+          {stripeStatus === null ? (
+            <div style={{ color: '#64748b', fontSize: '14px' }}>Loading payment status...</div>
+          ) : !stripeStatus.hasAccount ? (
+            // No Stripe account - show setup button
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fef3c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CreditCard size={20} style={{ color: '#f59e0b' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '600', color: '#1e293b' }}>Set up payments</div>
+                  <div style={{ fontSize: '13px', color: '#64748b' }}>Connect with Stripe to receive payouts</div>
+                </div>
+              </div>
+              <button
+                onClick={handleStripeOnboard}
+                disabled={stripeLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  backgroundColor: '#6366f1',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: stripeLoading ? 'not-allowed' : 'pointer',
+                  opacity: stripeLoading ? 0.7 : 1
+                }}
+              >
+                {stripeLoading ? 'Connecting...' : 'Connect Bank Account'}
+                <ExternalLink size={16} />
+              </button>
+            </div>
+          ) : !stripeStatus.onboardingComplete ? (
+            // Onboarding started but not complete
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fef3c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '600', color: '#1e293b' }}>Complete your setup</div>
+                  <div style={{ fontSize: '13px', color: '#64748b' }}>Finish setting up your Stripe account</div>
+                </div>
+              </div>
+              <button
+                onClick={handleStripeOnboard}
+                disabled={stripeLoading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: stripeLoading ? 'not-allowed' : 'pointer',
+                  opacity: stripeLoading ? 0.7 : 1
+                }}
+              >
+                {stripeLoading ? 'Loading...' : 'Continue Setup'}
+                <ExternalLink size={16} />
+              </button>
+            </div>
+          ) : (
+            // Fully connected
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#dcfce7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CheckCircle size={20} style={{ color: '#22c55e' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '600', color: '#1e293b' }}>Payments connected</div>
+                  <div style={{ fontSize: '13px', color: '#64748b' }}>
+                    {stripeStatus.chargesEnabled && stripeStatus.payoutsEnabled
+                      ? 'Your account is fully set up to receive payments'
+                      : 'Account connected, some features may be pending verification'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={handleStripeDashboard}
+                  disabled={stripeLoading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 16px',
+                    backgroundColor: 'white',
+                    color: '#6366f1',
+                    border: '2px solid #6366f1',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: stripeLoading ? 'not-allowed' : 'pointer',
+                    opacity: stripeLoading ? 0.7 : 1
+                  }}
+                >
+                  View Stripe Dashboard
+                  <ExternalLink size={14} />
+                </button>
+              </div>
+              {(!stripeStatus.chargesEnabled || !stripeStatus.payoutsEnabled) && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '12px',
+                  backgroundColor: '#fef3c7',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  color: '#92400e'
+                }}>
+                  Note: {!stripeStatus.chargesEnabled && 'Charges'}{!stripeStatus.chargesEnabled && !stripeStatus.payoutsEnabled && ' and '}{!stripeStatus.payoutsEnabled && 'Payouts'} are pending.
+                  Stripe may require additional verification.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
