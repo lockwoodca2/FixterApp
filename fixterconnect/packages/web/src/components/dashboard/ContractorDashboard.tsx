@@ -2760,8 +2760,26 @@ const ContractorDashboard: React.FC = () => {
                           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: '0 0 4px 0' }}>
                             {job.client?.firstName} {job.client?.lastName}
                           </h3>
-                          <p style={{ color: '#4f46e5', fontSize: '14px', fontWeight: '600', margin: 0 }}>
+                          <p style={{ color: '#4f46e5', fontSize: '14px', fontWeight: '600', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {job.service?.name} • {formatScheduledTime(job.scheduledTime)} ({job.duration || '90 min'})
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditJob(job);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                color: '#64748b'
+                              }}
+                              title="Edit booking"
+                            >
+                              <Edit2 size={14} />
+                            </button>
                           </p>
                         </div>
                       </div>
