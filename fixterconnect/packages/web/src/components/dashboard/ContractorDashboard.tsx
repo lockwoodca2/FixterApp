@@ -6076,9 +6076,9 @@ const ContractorDashboard: React.FC = () => {
                 style={{
                   padding: '8px 20px',
                   borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#6366f1',
-                  color: 'white',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: 'white',
+                  color: '#374151',
                   fontSize: '14px',
                   fontWeight: '600',
                   cursor: 'pointer'
