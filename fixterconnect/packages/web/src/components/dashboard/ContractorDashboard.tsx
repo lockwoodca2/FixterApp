@@ -185,6 +185,13 @@ const ContractorDashboard: React.FC = () => {
   const [isCompletionRecording, setIsCompletionRecording] = useState(false);
   const [completionSpeechRecognition, setCompletionSpeechRecognition] = useState<any>(null);
 
+  // Quote Modal states
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<any>(null);
+  const [quotePrice, setQuotePrice] = useState('');
+  const [quoteNotes, setQuoteNotes] = useState('');
+  const [sendingQuote, setSendingQuote] = useState(false);
+
   // Settings states
   const [settingsTab, setSettingsTab] = useState<'profile' | 'services' | 'areas' | 'materials'>('profile');
   const [materials, setMaterials] = useState<any[]>([]);
@@ -1405,6 +1412,89 @@ const ContractorDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error cancelling job:', error);
       showToast('Failed to cancel job. Please try again.', 'error');
+    }
+  };
+
+  // Quote handlers
+  const handleOpenQuoteModal = (quote: any) => {
+    setSelectedQuote(quote);
+    setQuotePrice('');
+    setQuoteNotes('');
+    setShowQuoteModal(true);
+  };
+
+  const handleSendQuote = async () => {
+    if (!selectedQuote || !quotePrice) {
+      showToast('Please enter a price for the quote', 'error');
+      return;
+    }
+
+    const price = parseFloat(quotePrice);
+    if (isNaN(price) || price <= 0) {
+      showToast('Please enter a valid price', 'error');
+      return;
+    }
+
+    try {
+      setSendingQuote(true);
+
+      // Update the booking with the price and change status to CONFIRMED
+      const response = await fetch(`${API_BASE_URL}/bookings/${selectedQuote.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CONFIRMED',
+          price: price
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showToast('Quote sent successfully! The client has been notified.', 'success');
+        setShowQuoteModal(false);
+        setSelectedQuote(null);
+        setQuotePrice('');
+        setQuoteNotes('');
+        fetchContractorData();
+      } else {
+        showToast(data.error || 'Failed to send quote', 'error');
+      }
+    } catch (error) {
+      console.error('Error sending quote:', error);
+      showToast('Failed to send quote. Please try again.', 'error');
+    } finally {
+      setSendingQuote(false);
+    }
+  };
+
+  const handleDeclineQuote = async (quote: any) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to decline this quote request from ${quote.client.firstName} ${quote.client.lastName} for ${quote.service.name}?`
+    );
+    if (!confirmed) return;
+
+    try {
+      // Update status to CANCELLED to decline the quote
+      const response = await fetch(`${API_BASE_URL}/bookings/${quote.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CANCELLED'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        showToast('Quote request declined', 'info');
+        fetchContractorData();
+      } else {
+        showToast(data.error || 'Failed to decline quote', 'error');
+      }
+    } catch (error) {
+      console.error('Error declining quote:', error);
+      showToast('Failed to decline quote. Please try again.', 'error');
     }
   };
 
@@ -3849,11 +3939,20 @@ const ContractorDashboard: React.FC = () => {
               <p style={{ color: '#64748b', marginBottom: '4px' }}>
                 <strong>Date:</strong> {formatDateLocal(quote.scheduledDate)}
               </p>
+              <p style={{ color: '#64748b', marginBottom: '4px' }}>
+                <strong>Time:</strong> {quote.scheduledTime}
+              </p>
               <p style={{ color: '#64748b', marginBottom: '16px' }}>
                 <strong>Address:</strong> {quote.serviceAddress}
               </p>
+              {quote.notes && (
+                <p style={{ color: '#64748b', marginBottom: '16px', fontStyle: 'italic' }}>
+                  <strong>Notes:</strong> {quote.notes}
+                </p>
+              )}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
+                  onClick={() => handleOpenQuoteModal(quote)}
                   style={{
                     padding: '10px 20px',
                     backgroundColor: '#3b82f6',
@@ -3868,12 +3967,12 @@ const ContractorDashboard: React.FC = () => {
                   Send Quote
                 </button>
                 <button
-                  onClick={() => handleCancelJob(quote.id, `${quote.client.firstName} ${quote.client.lastName} - ${quote.service.name}`)}
+                  onClick={() => handleDeclineQuote(quote)}
                   style={{
                     padding: '10px 20px',
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    border: 'none',
+                    backgroundColor: 'white',
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '14px',
                     fontWeight: 'bold',
@@ -3888,6 +3987,196 @@ const ContractorDashboard: React.FC = () => {
         </div>
       ) : (
         <p style={{ color: '#94a3b8' }}>No pending quote requests</p>
+      )}
+
+      {/* Send Quote Modal */}
+      {showQuoteModal && selectedQuote && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: '#1e293b',
+                margin: 0
+              }}>
+                Send Quote
+              </h2>
+              <button
+                onClick={() => {
+                  setShowQuoteModal(false);
+                  setSelectedQuote(null);
+                }}
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={24} color="#64748b" />
+              </button>
+            </div>
+
+            {/* Quote Details */}
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '16px',
+              borderRadius: '8px',
+              marginBottom: '24px'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+                {selectedQuote.service.name}
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '4px' }}>
+                <strong>Client:</strong> {selectedQuote.client.firstName} {selectedQuote.client.lastName}
+              </p>
+              <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '4px' }}>
+                <strong>Date:</strong> {formatDateLocal(selectedQuote.scheduledDate)}
+              </p>
+              <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '4px' }}>
+                <strong>Time:</strong> {selectedQuote.scheduledTime}
+              </p>
+              <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>
+                <strong>Address:</strong> {selectedQuote.serviceAddress}
+              </p>
+            </div>
+
+            {/* Price Input */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1e293b',
+                marginBottom: '8px'
+              }}>
+                Quote Price *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#64748b',
+                  fontSize: '16px',
+                  fontWeight: '600'
+                }}>
+                  $
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={quotePrice}
+                  onChange={(e) => setQuotePrice(e.target.value)}
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px 12px 30px',
+                    borderRadius: '8px',
+                    border: '2px solid #e2e8f0',
+                    fontSize: '16px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Notes Input */}
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#1e293b',
+                marginBottom: '8px'
+              }}>
+                Notes (optional)
+              </label>
+              <textarea
+                value={quoteNotes}
+                onChange={(e) => setQuoteNotes(e.target.value)}
+                placeholder="Add any details about the quote..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  border: '2px solid #e2e8f0',
+                  fontSize: '14px',
+                  resize: 'vertical',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowQuoteModal(false);
+                  setSelectedQuote(null);
+                }}
+                disabled={sendingQuote}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'white',
+                  color: '#64748b',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: sendingQuote ? 'not-allowed' : 'pointer',
+                  opacity: sendingQuote ? 0.5 : 1
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendQuote}
+                disabled={sendingQuote || !quotePrice}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: sendingQuote || !quotePrice ? '#94a3b8' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: sendingQuote || !quotePrice ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {sendingQuote ? 'Sending...' : 'Send Quote'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
