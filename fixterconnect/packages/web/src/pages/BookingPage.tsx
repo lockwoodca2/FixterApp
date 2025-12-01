@@ -24,25 +24,32 @@ const getLocalDateString = (date: Date = new Date()) => {
 
 interface BookingPageData {
   contractor: {
-    id: string;
-    businessName: string;
-    firstName: string;
-    lastName: string;
-    profilePhoto: string | null;
-    bio: string;
-    avgRating: number;
-    totalReviews: number;
-    yearsExperience: number;
+    id: number;
+    name: string;
+    description: string | null;
+    location: string | null;
+    phone: string | null;
+    email: string | null;
+    profilePicture: string | null;
+    rating: number | null;
+    reviewCount: number;
+    yearsInBusiness: number | null;
+    verified: boolean;
+    licensed: boolean;
+    insured: boolean;
     services: Array<{
-      id: string;
-      name: string;
-      description: string;
-      basePrice: number;
+      id: number;
+      basePrice: number | null;
+      service: {
+        id: number;
+        name: string;
+        description: string | null;
+      };
     }>;
     reviews: Array<{
-      id: string;
+      id: number;
       rating: number;
-      comment: string;
+      comment: string | null;
       createdAt: string;
       client: {
         firstName: string;
@@ -50,9 +57,10 @@ interface BookingPageData {
       };
     }>;
   };
-  settings: {
-    primaryColor: string | null;
-    accentColor: string | null;
+  bookingPage: {
+    slug: string;
+    primaryColor: string;
+    accentColor: string;
     tagline: string | null;
     logo: string | null;
     showReviews: boolean;
@@ -95,8 +103,8 @@ const BookingPage: React.FC = () => {
   const [authSuccess, setAuthSuccess] = useState(false);
 
   // Get colors with fallbacks
-  const primaryColor = pageData?.settings.primaryColor || '#3b82f6';
-  const accentColor = pageData?.settings.accentColor || '#10b981';
+  const primaryColor = pageData?.bookingPage.primaryColor || '#3b82f6';
+  const accentColor = pageData?.bookingPage.accentColor || '#10b981';
 
   useEffect(() => {
     loadBookingPage();
@@ -120,10 +128,13 @@ const BookingPage: React.FC = () => {
 
       const data = await response.json();
       if (data.success) {
-        setPageData(data.data);
+        // Map API response to our interface
+        setPageData({
+          contractor: data.contractor,
+          bookingPage: data.bookingPage
+        });
 
-        // Load availability
-        const contractorId = data.data.contractor.id;
+        // Load availability (contractorId available from data.contractor.id)
         const startDate = getLocalDateString();
         const endDateObj = new Date();
         endDateObj.setDate(endDateObj.getDate() + 30);
@@ -318,8 +329,8 @@ const BookingPage: React.FC = () => {
     );
   }
 
-  const { contractor, settings } = pageData;
-  const displayName = contractor.businessName || `${contractor.firstName} ${contractor.lastName}`;
+  const { contractor, bookingPage } = pageData;
+  const displayName = contractor.name || 'Contractor';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -329,15 +340,15 @@ const BookingPage: React.FC = () => {
         style={{ backgroundColor: primaryColor }}
       >
         <div className="max-w-4xl mx-auto flex items-center gap-4">
-          {settings.logo ? (
+          {bookingPage.logo ? (
             <img
-              src={settings.logo}
+              src={bookingPage.logo}
               alt={displayName}
               className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-lg"
             />
-          ) : contractor.profilePhoto ? (
+          ) : contractor.profilePicture ? (
             <img
-              src={contractor.profilePhoto}
+              src={contractor.profilePicture}
               alt={displayName}
               className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-lg"
             />
@@ -348,8 +359,8 @@ const BookingPage: React.FC = () => {
           )}
           <div className="text-white">
             <h1 className="text-2xl font-bold">{displayName}</h1>
-            {settings.tagline && (
-              <p className="text-white/90">{settings.tagline}</p>
+            {bookingPage.tagline && (
+              <p className="text-white/90">{bookingPage.tagline}</p>
             )}
           </div>
         </div>
@@ -359,21 +370,21 @@ const BookingPage: React.FC = () => {
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Stats Row */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          {settings.showReviews && (
+          {bookingPage.showReviews && (
             <div className="bg-white rounded-xl p-4 text-center shadow-sm">
               <div className="flex items-center justify-center gap-1 text-yellow-500 mb-1">
                 <Star className="w-5 h-5 fill-current" />
                 <span className="text-xl font-bold text-gray-900">
-                  {contractor.avgRating?.toFixed(1) || 'New'}
+                  {contractor.rating?.toFixed(1) || 'New'}
                 </span>
               </div>
-              <p className="text-sm text-gray-500">{contractor.totalReviews} reviews</p>
+              <p className="text-sm text-gray-500">{contractor.reviewCount} reviews</p>
             </div>
           )}
           <div className="bg-white rounded-xl p-4 text-center shadow-sm">
             <div className="flex items-center justify-center gap-1 mb-1">
               <Award className="w-5 h-5" style={{ color: primaryColor }} />
-              <span className="text-xl font-bold text-gray-900">{contractor.yearsExperience || 0}</span>
+              <span className="text-xl font-bold text-gray-900">{contractor.yearsInBusiness || 0}</span>
             </div>
             <p className="text-sm text-gray-500">Years Experience</p>
           </div>
@@ -386,10 +397,10 @@ const BookingPage: React.FC = () => {
         </div>
 
         {/* About */}
-        {contractor.bio && (
+        {contractor.description && (
           <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">About</h2>
-            <p className="text-gray-600">{contractor.bio}</p>
+            <p className="text-gray-600">{contractor.description}</p>
           </div>
         )}
 
@@ -397,24 +408,24 @@ const BookingPage: React.FC = () => {
         <div className="bg-white rounded-xl p-6 shadow-sm mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Services</h2>
           <div className="space-y-4">
-            {contractor.services.map((service) => (
+            {contractor.services.map((cs) => (
               <div
-                key={service.id}
+                key={cs.id}
                 className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
               >
                 <div>
-                  <h3 className="font-medium text-gray-900">{service.name}</h3>
-                  {service.description && (
-                    <p className="text-sm text-gray-500 mt-1">{service.description}</p>
+                  <h3 className="font-medium text-gray-900">{cs.service.name}</h3>
+                  {cs.service.description && (
+                    <p className="text-sm text-gray-500 mt-1">{cs.service.description}</p>
                   )}
-                  {settings.showPrices && service.basePrice > 0 && (
+                  {bookingPage.showPrices && cs.basePrice && cs.basePrice > 0 && (
                     <p className="text-sm font-medium mt-1" style={{ color: primaryColor }}>
-                      Starting at ${service.basePrice}
+                      Starting at ${cs.basePrice}
                     </p>
                   )}
                 </div>
                 <button
-                  onClick={() => handleBookService(service.id)}
+                  onClick={() => handleBookService(cs.service.id.toString())}
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors hover:opacity-90"
                   style={{ backgroundColor: primaryColor }}
                 >
@@ -426,10 +437,10 @@ const BookingPage: React.FC = () => {
         </div>
 
         {/* Reviews */}
-        {settings.showReviews && contractor.reviews.length > 0 && (
+        {bookingPage.showReviews && contractor.reviews.length > 0 && (
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Customer Reviews ({contractor.totalReviews})
+              Customer Reviews ({contractor.reviewCount})
             </h2>
             <div className="space-y-4">
               {contractor.reviews.slice(0, 5).map((review) => (
@@ -661,9 +672,9 @@ const BookingPage: React.FC = () => {
                       required
                     >
                       <option value="">Select a service</option>
-                      {contractor.services.map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {service.name} {settings.showPrices && service.basePrice > 0 ? `- $${service.basePrice}` : ''}
+                      {contractor.services.map((cs) => (
+                        <option key={cs.service.id} value={cs.service.id}>
+                          {cs.service.name} {bookingPage.showPrices && cs.basePrice && cs.basePrice > 0 ? `- $${cs.basePrice}` : ''}
                         </option>
                       ))}
                     </select>
