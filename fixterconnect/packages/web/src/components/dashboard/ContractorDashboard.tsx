@@ -25,7 +25,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'settings';
+type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'earnings' | 'settings';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -228,6 +228,39 @@ const ContractorDashboard: React.FC = () => {
     stripeAccountId?: string;
   } | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
+
+  // Earnings states
+  const [earnings, setEarnings] = useState<{
+    summary: {
+      totalEarnings: number;
+      platformFees: number;
+      paymentCount: number;
+      pendingAmount: number;
+    };
+    payments: Array<{
+      id: number;
+      amount: number;
+      platformFee: number;
+      contractorPayout: number;
+      status: string;
+      createdAt: string;
+      invoice: {
+        id: number;
+        totalAmount: number;
+        booking: {
+          service: { name: string };
+          client: { firstName: string; lastName: string };
+        };
+      };
+    }>;
+    monthlyBreakdown: Array<{
+      month: string;
+      earnings: number;
+      fees: number;
+      count: number;
+    }>;
+  } | null>(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
 
   // Toast notification helper
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
@@ -1412,6 +1445,7 @@ const ContractorDashboard: React.FC = () => {
     { id: 'history' as ActiveSection, label: 'Job History', icon: Clock },
     { id: 'calendar' as ActiveSection, label: 'Calendar', icon: Calendar },
     { id: 'quotes' as ActiveSection, label: 'Quotes', icon: DollarSign },
+    { id: 'earnings' as ActiveSection, label: 'Earnings', icon: CreditCard },
     { id: 'settings' as ActiveSection, label: 'Settings', icon: Settings }
   ];
 
@@ -3858,12 +3892,286 @@ const ContractorDashboard: React.FC = () => {
     </div>
   );
 
+  const renderEarnings = () => {
+    if (earningsLoading) {
+      return (
+        <div style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #e2e8f0',
+            borderTop: '3px solid #6366f1',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '40px auto'
+          }} />
+          <p style={{ color: '#64748b' }}>Loading earnings...</p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      );
+    }
+
+    if (!earnings) {
+      return (
+        <div style={{ padding: '24px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
+            Earnings
+          </h2>
+          <div style={{
+            backgroundColor: '#fef3c7',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '1px solid #fbbf24',
+            textAlign: 'center'
+          }}>
+            <CreditCard size={48} color="#f59e0b" style={{ marginBottom: '12px' }} />
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#92400e', marginBottom: '8px' }}>
+              Set Up Payment Account
+            </h3>
+            <p style={{ color: '#a16207', marginBottom: '16px' }}>
+              Complete your Stripe Connect setup in Settings to receive payments and view earnings.
+            </p>
+            <button
+              onClick={() => setActiveSection('settings')}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Go to Settings
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const { summary, payments, monthlyBreakdown } = earnings;
+
+    return (
+      <div style={{ padding: '24px' }}>
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
+          Earnings
+        </h2>
+
+        {/* Summary Cards */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px',
+          marginBottom: '32px'
+        }}>
+          {/* Total Earnings */}
+          <div style={{
+            backgroundColor: '#ecfdf5',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '1px solid #a7f3d0'
+          }}>
+            <p style={{ fontSize: '14px', color: '#059669', marginBottom: '4px', fontWeight: '600' }}>
+              Total Earnings
+            </p>
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#047857' }}>
+              ${summary.totalEarnings.toFixed(2)}
+            </p>
+          </div>
+
+          {/* Platform Fees */}
+          <div style={{
+            backgroundColor: '#f8fafc',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px', fontWeight: '600' }}>
+              Platform Fees (5%)
+            </p>
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#1e293b' }}>
+              ${summary.platformFees.toFixed(2)}
+            </p>
+          </div>
+
+          {/* Payment Count */}
+          <div style={{
+            backgroundColor: '#eff6ff',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '1px solid #bfdbfe'
+          }}>
+            <p style={{ fontSize: '14px', color: '#3b82f6', marginBottom: '4px', fontWeight: '600' }}>
+              Payments Received
+            </p>
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#1d4ed8' }}>
+              {summary.paymentCount}
+            </p>
+          </div>
+
+          {/* Pending Amount */}
+          <div style={{
+            backgroundColor: '#fef3c7',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '1px solid #fcd34d'
+          }}>
+            <p style={{ fontSize: '14px', color: '#d97706', marginBottom: '4px', fontWeight: '600' }}>
+              Pending
+            </p>
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#b45309' }}>
+              ${summary.pendingAmount.toFixed(2)}
+            </p>
+          </div>
+        </div>
+
+        {/* Monthly Breakdown */}
+        {monthlyBreakdown.length > 0 && (
+          <div style={{ marginBottom: '32px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '16px' }}>
+              Monthly Breakdown
+            </h3>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              overflow: 'hidden'
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Month</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Earnings</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Fees</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Payments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyBreakdown.map((month, index) => (
+                    <tr key={month.month} style={{ borderTop: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '12px 16px', fontSize: '14px', color: '#1e293b' }}>{month.month}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#059669', fontWeight: '600' }}>${month.earnings.toFixed(2)}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#64748b' }}>${month.fees.toFixed(2)}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#1e293b' }}>{month.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Recent Payments */}
+        <div>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '16px' }}>
+            Recent Payments
+          </h3>
+          {payments.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {payments.map(payment => (
+                <div
+                  key={payment.id}
+                  style={{
+                    backgroundColor: 'white',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <p style={{ fontSize: '15px', fontWeight: '600', color: '#1e293b', marginBottom: '4px' }}>
+                      {payment.invoice?.booking?.service?.name || 'Service'}
+                    </p>
+                    <p style={{ fontSize: '13px', color: '#64748b' }}>
+                      {payment.invoice?.booking?.client
+                        ? `${payment.invoice.booking.client.firstName} ${payment.invoice.booking.client.lastName}`
+                        : 'Client'} • {new Date(payment.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#059669' }}>
+                      ${payment.contractorPayout.toFixed(2)}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      Fee: ${payment.platformFee.toFixed(2)}
+                    </p>
+                    <span style={{
+                      display: 'inline-block',
+                      marginTop: '4px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      backgroundColor: payment.status === 'SUCCEEDED' ? '#dcfce7' : '#fef3c7',
+                      color: payment.status === 'SUCCEEDED' ? '#166534' : '#92400e'
+                    }}>
+                      {payment.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '40px',
+              borderRadius: '12px',
+              textAlign: 'center'
+            }}>
+              <CreditCard size={48} color="#94a3b8" style={{ marginBottom: '12px' }} />
+              <p style={{ color: '#64748b', fontSize: '15px' }}>
+                No payments received yet. Once clients pay their invoices, they'll appear here.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Load settings data when settings tab is active
   useEffect(() => {
     if (activeSection === 'settings' && user?.id) {
       loadSettingsData();
     }
   }, [activeSection, user?.id]);
+
+  // Load earnings data when earnings tab is active
+  useEffect(() => {
+    if (activeSection === 'earnings' && user?.id) {
+      fetchEarnings();
+    }
+  }, [activeSection, user?.id]);
+
+  const fetchEarnings = async () => {
+    if (!user?.id) return;
+
+    try {
+      setEarningsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/stripe/earnings/${user.id}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setEarnings(data);
+      } else {
+        console.error('Error fetching earnings:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching earnings:', error);
+    } finally {
+      setEarningsLoading(false);
+    }
+  };
 
   // Check for Stripe onboarding return
   useEffect(() => {
@@ -5132,6 +5440,8 @@ const ContractorDashboard: React.FC = () => {
         return renderCalendar();
       case 'quotes':
         return renderQuotes();
+      case 'earnings':
+        return renderEarnings();
       case 'settings':
         return renderSettings();
       default:

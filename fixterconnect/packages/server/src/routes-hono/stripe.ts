@@ -571,4 +571,438 @@ stripe.get('/stripe/config', async (c) => {
   });
 });
 
+// ============================================
+// EARNINGS ENDPOINTS
+// ============================================
+
+// GET /api/stripe/earnings/:contractorId - Get contractor earnings summary and payment history
+stripe.get('/stripe/earnings/:contractorId', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId } = c.req.param();
+    const { period } = c.req.query(); // 'week', 'month', 'year', 'all'
+
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate: Date | null = null;
+
+    switch (period) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = null; // All time
+    }
+
+    // Build where clause
+    const whereClause: any = {
+      booking: {
+        contractorId: parseInt(contractorId)
+      },
+      status: 'SUCCEEDED'
+    };
+
+    if (startDate) {
+      whereClause.paidAt = { gte: startDate };
+    }
+
+    // Get all successful payments for this contractor
+    const payments = await prisma.payment.findMany({
+      where: whereClause,
+      include: {
+        booking: {
+          include: {
+            client: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            },
+            service: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        invoice: {
+          select: {
+            id: true
+          }
+        }
+      },
+      orderBy: {
+        paidAt: 'desc'
+      }
+    });
+
+    // Calculate totals
+    const totalEarnings = payments.reduce((sum, p) => sum + (p.contractorPayout || 0), 0);
+    const totalPlatformFees = payments.reduce((sum, p) => sum + (p.platformFee || 0), 0);
+    const totalGross = payments.reduce((sum, p) => sum + p.amount, 0);
+    const paymentCount = payments.length;
+
+    // Get pending payments (invoices not yet paid)
+    const pendingInvoices = await prisma.invoice.findMany({
+      where: {
+        booking: {
+          contractorId: parseInt(contractorId)
+        },
+        status: 'PENDING'
+      },
+      select: {
+        totalAmount: true
+      }
+    });
+
+    const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+    const pendingCount = pendingInvoices.length;
+
+    // Transform payments for response
+    const paymentHistory = payments.map(p => ({
+      id: p.id,
+      date: p.paidAt?.toISOString() || p.createdAt.toISOString(),
+      clientName: `${p.booking.client.firstName} ${p.booking.client.lastName}`,
+      serviceName: p.booking.service.name,
+      grossAmount: p.amount,
+      platformFee: p.platformFee || 0,
+      netAmount: p.contractorPayout || p.amount,
+      invoiceId: p.invoice?.id || null,
+      bookingId: p.bookingId
+    }));
+
+    // Calculate monthly breakdown for the current year
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const monthlyPayments = await prisma.payment.findMany({
+      where: {
+        booking: {
+          contractorId: parseInt(contractorId)
+        },
+        status: 'SUCCEEDED',
+        paidAt: { gte: yearStart }
+      },
+      select: {
+        contractorPayout: true,
+        paidAt: true
+      }
+    });
+
+    const monthlyBreakdown: { [key: string]: number } = {};
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    monthlyPayments.forEach(p => {
+      if (p.paidAt) {
+        const monthKey = months[p.paidAt.getMonth()];
+        monthlyBreakdown[monthKey] = (monthlyBreakdown[monthKey] || 0) + (p.contractorPayout || 0);
+      }
+    });
+
+    return c.json({
+      success: true,
+      earnings: {
+        summary: {
+          totalEarnings: Math.round(totalEarnings * 100) / 100,
+          totalPlatformFees: Math.round(totalPlatformFees * 100) / 100,
+          totalGross: Math.round(totalGross * 100) / 100,
+          paymentCount,
+          pendingAmount: Math.round(pendingAmount * 100) / 100,
+          pendingCount,
+          period: period || 'all'
+        },
+        payments: paymentHistory,
+        monthlyBreakdown
+      }
+    });
+  } catch (error) {
+    console.error('Get earnings error:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get earnings'
+    }, 500);
+  }
+});
+
+// ============================================
+// WEBHOOK ENDPOINT
+// ============================================
+
+// POST /api/stripe/webhook - Handle Stripe webhook events
+stripe.post('/stripe/webhook', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+      console.error('Stripe secret key not configured');
+      return c.json({ error: 'Stripe not configured' }, 500);
+    }
+
+    const stripeClient = getStripe(c.env.STRIPE_SECRET_KEY);
+    const signature = c.req.header('stripe-signature');
+
+    if (!signature) {
+      console.error('No Stripe signature found');
+      return c.json({ error: 'No signature' }, 400);
+    }
+
+    // Get raw body for signature verification
+    const rawBody = await c.req.text();
+
+    let event: Stripe.Event;
+
+    // Verify webhook signature if secret is configured
+    if (c.env.STRIPE_WEBHOOK_SECRET) {
+      try {
+        event = stripeClient.webhooks.constructEvent(
+          rawBody,
+          signature,
+          c.env.STRIPE_WEBHOOK_SECRET
+        );
+      } catch (err) {
+        console.error('Webhook signature verification failed:', err);
+        return c.json({ error: 'Invalid signature' }, 400);
+      }
+    } else {
+      // In development, parse without verification (not recommended for production)
+      console.warn('STRIPE_WEBHOOK_SECRET not set - skipping signature verification');
+      event = JSON.parse(rawBody) as Stripe.Event;
+    }
+
+    console.log(`Received Stripe webhook: ${event.type}`);
+
+    // Handle different event types
+    switch (event.type) {
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        await handlePaymentIntentSucceeded(prisma, stripeClient, paymentIntent);
+        break;
+      }
+
+      case 'payment_intent.payment_failed': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        await handlePaymentIntentFailed(prisma, paymentIntent);
+        break;
+      }
+
+      case 'account.updated': {
+        const account = event.data.object as Stripe.Account;
+        await handleAccountUpdated(prisma, account);
+        break;
+      }
+
+      case 'transfer.created': {
+        const transfer = event.data.object as Stripe.Transfer;
+        console.log(`Transfer created: ${transfer.id} for $${transfer.amount / 100}`);
+        break;
+      }
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    return c.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return c.json({
+      error: error instanceof Error ? error.message : 'Webhook processing failed'
+    }, 500);
+  }
+});
+
+// Helper function to handle successful payment
+async function handlePaymentIntentSucceeded(
+  prisma: any,
+  stripeClient: Stripe,
+  paymentIntent: Stripe.PaymentIntent
+) {
+  const invoiceId = paymentIntent.metadata?.invoiceId;
+
+  if (!invoiceId) {
+    console.log('PaymentIntent has no invoiceId in metadata, skipping');
+    return;
+  }
+
+  // Check if we already processed this payment
+  const existingPayment = await prisma.payment.findFirst({
+    where: { stripePaymentIntent: paymentIntent.id }
+  });
+
+  if (existingPayment) {
+    console.log(`Payment already recorded for PaymentIntent ${paymentIntent.id}`);
+    return;
+  }
+
+  // Get invoice details
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: parseInt(invoiceId) },
+    include: {
+      booking: {
+        include: {
+          contractor: true
+        }
+      }
+    }
+  });
+
+  if (!invoice) {
+    console.error(`Invoice ${invoiceId} not found for PaymentIntent ${paymentIntent.id}`);
+    return;
+  }
+
+  if (invoice.status === 'PAID') {
+    console.log(`Invoice ${invoiceId} already marked as paid`);
+    return;
+  }
+
+  // Calculate fee breakdown
+  const totalAmount = paymentIntent.amount / 100;
+  const platformFee = (paymentIntent.application_fee_amount || 0) / 100;
+  const contractorPayout = totalAmount - platformFee;
+
+  // Get the transfer ID
+  let stripeTransferId = null;
+  if (paymentIntent.transfer_data?.destination) {
+    try {
+      const transfers = await stripeClient.transfers.list({
+        destination: paymentIntent.transfer_data.destination as string,
+        limit: 5,
+      });
+      // Find transfer for this payment
+      const matchingTransfer = transfers.data.find(
+        t => t.source_transaction === paymentIntent.latest_charge
+      );
+      if (matchingTransfer) {
+        stripeTransferId = matchingTransfer.id;
+      }
+    } catch (err) {
+      console.error('Error fetching transfer:', err);
+    }
+  }
+
+  // Create payment record
+  await prisma.payment.create({
+    data: {
+      bookingId: invoice.bookingId,
+      invoiceId: invoice.id,
+      amount: totalAmount,
+      paymentMethod: 'card',
+      stripePaymentId: paymentIntent.id,
+      stripePaymentIntent: paymentIntent.id,
+      platformFee,
+      contractorPayout,
+      stripeTransferId,
+      status: 'SUCCEEDED',
+      paidAt: new Date(),
+    }
+  });
+
+  // Update invoice status
+  await prisma.invoice.update({
+    where: { id: parseInt(invoiceId) },
+    data: {
+      status: 'PAID',
+      paidAt: new Date(),
+    }
+  });
+
+  // Update booking payment status
+  await prisma.booking.update({
+    where: { id: invoice.bookingId },
+    data: {
+      paymentReceived: true
+    }
+  });
+
+  console.log(`Successfully processed payment for invoice ${invoiceId}`);
+}
+
+// Helper function to handle failed payment
+async function handlePaymentIntentFailed(
+  prisma: any,
+  paymentIntent: Stripe.PaymentIntent
+) {
+  const invoiceId = paymentIntent.metadata?.invoiceId;
+
+  if (!invoiceId) {
+    return;
+  }
+
+  console.log(`Payment failed for invoice ${invoiceId}: ${paymentIntent.last_payment_error?.message}`);
+
+  // Optionally create a failed payment record for tracking
+  const existingPayment = await prisma.payment.findFirst({
+    where: { stripePaymentIntent: paymentIntent.id }
+  });
+
+  if (!existingPayment) {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: parseInt(invoiceId) }
+    });
+
+    if (invoice) {
+      await prisma.payment.create({
+        data: {
+          bookingId: invoice.bookingId,
+          invoiceId: invoice.id,
+          amount: paymentIntent.amount / 100,
+          paymentMethod: 'card',
+          stripePaymentId: paymentIntent.id,
+          stripePaymentIntent: paymentIntent.id,
+          status: 'FAILED',
+        }
+      });
+    }
+  }
+}
+
+// Helper function to handle Connect account updates
+async function handleAccountUpdated(
+  prisma: any,
+  account: Stripe.Account
+) {
+  const contractorId = account.metadata?.contractorId;
+
+  // Find contractor by Stripe account ID
+  const contractor = await prisma.contractor.findFirst({
+    where: {
+      OR: [
+        { stripeAccountId: account.id },
+        ...(contractorId ? [{ id: parseInt(contractorId) }] : [])
+      ]
+    }
+  });
+
+  if (!contractor) {
+    console.log(`No contractor found for Stripe account ${account.id}`);
+    return;
+  }
+
+  // Update contractor's Stripe status
+  const updates: any = {};
+
+  if (account.details_submitted !== undefined) {
+    updates.stripeOnboardingComplete = account.details_submitted;
+  }
+  if (account.charges_enabled !== undefined) {
+    updates.stripeChargesEnabled = account.charges_enabled;
+  }
+  if (account.payouts_enabled !== undefined) {
+    updates.stripePayoutsEnabled = account.payouts_enabled;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await prisma.contractor.update({
+      where: { id: contractor.id },
+      data: updates
+    });
+
+    console.log(`Updated Stripe status for contractor ${contractor.id}:`, updates);
+  }
+}
+
 export default stripe;
