@@ -661,7 +661,124 @@ const ContractorDashboard: React.FC = () => {
     setDraggedCalendarIndex(null);
   };
 
-  const handleAcceptCalendarScheduleChanges = (notifyCustomers: boolean) => {
+  const handleAcceptCalendarScheduleChanges = async (notifyCustomers: boolean) => {
+    if (editingJobId) {
+      // Handle single job edit
+      if (modalAction === 'delete') {
+        try {
+          const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}`, {
+            method: 'DELETE'
+          });
+
+          if (!response.ok) {
+            console.error('Failed to delete booking');
+            showToast('Failed to delete job. Please try again.', 'error');
+            setShowScheduleChanges(false);
+            setPendingReorder(null);
+            setAffectedAppointments([]);
+            setEditingJobId(null);
+            setEditFormData({});
+            return;
+          }
+
+          // Remove from local state
+          setSelectedDateJobs(selectedDateJobs.filter(job => job.id !== editingJobId));
+          setMonthlyBookings(monthlyBookings.filter(job => job.id !== editingJobId));
+
+          if (notifyCustomers) {
+            // TODO: Send notification to the customer about cancellation
+          }
+
+          showToast('Job deleted successfully', 'success');
+        } catch (error) {
+          console.error('Error deleting job:', error);
+          showToast('Failed to delete job. Please try again.', 'error');
+        }
+      } else {
+        // Handle time/date change - update via API
+        try {
+          const newScheduledTime = `${editFormData.startTime} - ${calculateEndTime(editFormData.startTime, editFormData.duration)}`;
+
+          // Find the job
+          const job = selectedDateJobs.find(j => j.id === editingJobId) || monthlyBookings.find(j => j.id === editingJobId);
+          if (!job) {
+            setShowScheduleChanges(false);
+            setPendingReorder(null);
+            setAffectedAppointments([]);
+            setEditingJobId(null);
+            setEditFormData({});
+            return;
+          }
+
+          // Use the new date from editFormData or keep existing
+          const newScheduledDate = editFormData.date || job.scheduledDate;
+
+          const response = await fetch(`${API_BASE_URL}/bookings/${editingJobId}/schedule`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scheduledDate: newScheduledDate,
+              scheduledTime: newScheduledTime,
+              estimatedDuration: parseInt(editFormData.duration)
+            })
+          });
+
+          if (!response.ok) {
+            console.error('Failed to update booking schedule');
+            showToast('Failed to update job. Please try again.', 'error');
+            setShowScheduleChanges(false);
+            setPendingReorder(null);
+            setAffectedAppointments([]);
+            setEditingJobId(null);
+            setEditFormData({});
+            return;
+          }
+
+          const updatedJob = {
+            ...job,
+            scheduledDate: newScheduledDate,
+            scheduledTime: newScheduledTime,
+            duration: `${editFormData.duration} min`
+          };
+
+          // Check if date changed - need to move between arrays
+          const dateChanged = newScheduledDate !== job.scheduledDate;
+
+          if (dateChanged) {
+            // Remove from selectedDateJobs if it was there
+            setSelectedDateJobs(selectedDateJobs.filter(j => j.id !== editingJobId));
+          } else {
+            // Update local state for selectedDateJobs
+            setSelectedDateJobs(selectedDateJobs.map(j =>
+              j.id === editingJobId ? updatedJob : j
+            ));
+          }
+
+          // Update monthlyBookings
+          setMonthlyBookings(monthlyBookings.map(j =>
+            j.id === editingJobId ? updatedJob : j
+          ));
+
+          if (notifyCustomers) {
+            // TODO: Send notification to the customer
+          }
+
+          showToast('Job updated successfully', 'success');
+        } catch (error) {
+          console.error('Error updating job:', error);
+          showToast('Failed to update job. Please try again.', 'error');
+        }
+      }
+
+      setEditingJobId(null);
+      setEditFormData({});
+      setShowScheduleChanges(false);
+      setPendingReorder(null);
+      setAffectedAppointments([]);
+      setModalAction('change');
+      return;
+    }
+
     if (pendingReorder) {
       // Apply the new schedule with calculated times
       const updatedJobs = pendingReorder.map((job, index) => {
@@ -710,9 +827,25 @@ const ContractorDashboard: React.FC = () => {
 
     setAffectedAppointments([affectedAppointment]);
     setEditingJobId(job.id);
+
+    // Parse the start time - handle both 12-hour and 24-hour formats
+    const scheduledTime = job.scheduledTime?.split(' - ')[0] || '';
+    let startTime24 = scheduledTime;
+
+    // Convert 12-hour format (e.g., "9:00 AM") to 24-hour format for input type="time"
+    if (scheduledTime.includes('AM') || scheduledTime.includes('PM')) {
+      const [time, period] = scheduledTime.split(' ');
+      const [hours, minutes] = time.split(':');
+      let hour = parseInt(hours);
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      startTime24 = `${hour.toString().padStart(2, '0')}:${minutes}`;
+    }
+
     setEditFormData({
-      startTime: job.scheduledTime?.split(' - ')[0] || '',
-      duration: job.duration?.replace(' min', '') || '90'
+      startTime: startTime24,
+      duration: job.duration?.replace(' min', '') || '90',
+      date: job.scheduledDate || ''
     });
     setTimeSlotConflicts([]);
     setNextAvailableTime(null);
@@ -6094,6 +6227,43 @@ const ContractorDashboard: React.FC = () => {
                         gap: '12px',
                         marginBottom: '12px'
                       }}>
+                        <div>
+                          <label style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontWeight: '600'
+                          }}>
+                            Date
+                          </label>
+                          <input
+                            type="date"
+                            value={editFormData.date}
+                            onChange={(e) => {
+                              setEditFormData({ ...editFormData, date: e.target.value });
+                              // Update affected appointment with new date for availability check
+                              const updatedAppointments = [...affectedAppointments];
+                              updatedAppointments[0] = {
+                                ...updatedAppointments[0],
+                                scheduledDate: e.target.value
+                              };
+                              setAffectedAppointments(updatedAppointments);
+                              // Check availability for new date
+                              if (editFormData.startTime && editFormData.duration) {
+                                checkTimeSlotAvailability({ ...affectedAppointments[0], scheduledDate: e.target.value }, editFormData.startTime, parseInt(editFormData.duration));
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '12px',
+                              border: '2px solid #e2e8f0',
+                              borderRadius: '8px',
+                              fontSize: '16px',
+                              fontWeight: '600'
+                            }}
+                          />
+                        </div>
                         <div>
                           <label style={{
                             fontSize: '12px',
