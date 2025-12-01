@@ -4416,18 +4416,25 @@ const ContractorDashboard: React.FC = () => {
             </p>
           </div>
 
-          {/* Platform Fees */}
+          {/* This Month Earnings */}
           <div style={{
-            backgroundColor: '#f8fafc',
+            backgroundColor: '#f0fdf4',
             padding: '20px',
             borderRadius: '12px',
-            border: '1px solid #e2e8f0'
+            border: '1px solid #86efac'
           }}>
-            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px', fontWeight: '600' }}>
-              Platform Fees (5%)
+            <p style={{ fontSize: '14px', color: '#16a34a', marginBottom: '4px', fontWeight: '600' }}>
+              This Month
             </p>
-            <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#1e293b' }}>
-              ${summary.platformFees.toFixed(2)}
+            <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#15803d' }}>
+              ${payments
+                .filter(p => {
+                  const paymentDate = new Date(p.date);
+                  const now = new Date();
+                  return paymentDate.getMonth() === now.getMonth() && paymentDate.getFullYear() === now.getFullYear();
+                })
+                .reduce((sum, p) => sum + (p.netAmount || 0), 0)
+                .toFixed(2)}
             </p>
           </div>
 
@@ -4463,7 +4470,7 @@ const ContractorDashboard: React.FC = () => {
         </div>
 
         {/* Monthly Breakdown */}
-        {monthlyBreakdown.length > 0 && (
+        {Object.keys(monthlyBreakdown).length > 0 && (
           <div style={{ marginBottom: '32px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', marginBottom: '16px' }}>
               Monthly Breakdown
@@ -4479,17 +4486,13 @@ const ContractorDashboard: React.FC = () => {
                   <tr style={{ backgroundColor: '#f8fafc' }}>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Month</th>
                     <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Earnings</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Fees</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: '600', color: '#64748b' }}>Payments</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {monthlyBreakdown.map((month, index) => (
-                    <tr key={month.month} style={{ borderTop: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '12px 16px', fontSize: '14px', color: '#1e293b' }}>{month.month}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#059669', fontWeight: '600' }}>${month.earnings.toFixed(2)}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#64748b' }}>${month.fees.toFixed(2)}</td>
-                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#1e293b' }}>{month.count}</td>
+                  {Object.entries(monthlyBreakdown).map(([month, amount]: [string, number]) => (
+                    <tr key={month} style={{ borderTop: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '12px 16px', fontSize: '14px', color: '#1e293b' }}>{month}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', color: '#059669', fontWeight: '600' }}>${amount.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
