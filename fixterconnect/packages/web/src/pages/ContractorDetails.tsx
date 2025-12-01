@@ -31,7 +31,7 @@ const getLocalDateString = (date: Date = new Date()) => {
 const ContractorDetails: React.FC = () => {
   const { contractorId } = useParams<{ contractorId: string }>();
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { user, userType, login } = useAuth();
 
   const [contractor, setContractor] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -309,6 +309,7 @@ const ContractorDetails: React.FC = () => {
       const loggedInUser = await login(authUsername, authPassword);
       if (loggedInUser) {
         // Check if user is a client (contractors can't book services)
+        // The login function sets userType in context, but we check loggedInUser.type for immediate feedback
         if (loggedInUser.type === 'contractor') {
           setAuthError('Contractors cannot book services. Please log in with a client account.');
           setIsAuthLoading(false);
@@ -479,8 +480,8 @@ const ContractorDetails: React.FC = () => {
   const renderBookingModal = () => {
     if (!showBookingModal || !contractor) return null;
 
-    // Check if user needs to authenticate
-    const needsAuth = !user || user.type === 'contractor';
+    // Check if user needs to authenticate (must be logged in as a client)
+    const needsAuth = !user || userType !== 'client';
 
     return (
       <div style={{
