@@ -6148,13 +6148,24 @@ const ContractorDashboard: React.FC = () => {
             <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '16px' }}>
               Premium Features
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '16px'
+            }}>
               {premiumFeatures.map((feature, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <CheckCircle size={20} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div key={index} style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  padding: '12px',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '8px'
+                }}>
+                  <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div>
-                    <p style={{ fontWeight: '600', color: '#1e293b', fontSize: '14px' }}>{feature.title}</p>
-                    <p style={{ color: '#64748b', fontSize: '13px' }}>{feature.description}</p>
+                    <p style={{ fontWeight: '600', color: '#1e293b', fontSize: '13px', marginBottom: '2px' }}>{feature.title}</p>
+                    <p style={{ color: '#64748b', fontSize: '12px', lineHeight: '1.4' }}>{feature.description}</p>
                   </div>
                 </div>
               ))}
