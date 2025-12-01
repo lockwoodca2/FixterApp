@@ -12,6 +12,7 @@ import invoicesRoutes from './routes/invoices.js';
 import adminRoutes from './routes/admin.js';
 import availabilityRoutes from './routes/availability.js';
 import uploadRoutes from './routes/uploads.js';
+import stripeRoutes from './routes/stripe.js';
 
 // Load environment variables
 dotenv.config();
@@ -47,6 +48,7 @@ app.use('/api', invoicesRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', availabilityRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', stripeRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
