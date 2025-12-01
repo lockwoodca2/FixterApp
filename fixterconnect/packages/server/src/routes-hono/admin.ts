@@ -517,4 +517,345 @@ admin.delete('/admin/users/:type/:id', async (c) => {
   }
 });
 
+// ============================================
+// REPORTS ENDPOINTS
+// ============================================
+
+// Get all reports with filtering
+admin.get('/admin/reports', async (c) => {
+  try {
+    const prisma = c.get('prisma') as any;
+    const { type, status, priority } = c.req.query();
+
+    const where: any = {};
+    if (type) where.type = type;
+    if (status) where.status = status;
+    if (priority) where.priority = priority;
+
+    const reports = await prisma.report.findMany({
+      where,
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'desc' }
+      ],
+      include: {
+        booking: {
+          include: {
+            contractor: {
+              select: { id: true, name: true }
+            },
+            client: {
+              select: { id: true, firstName: true, lastName: true }
+            },
+            service: {
+              select: { id: true, name: true }
+            }
+          }
+        }
+      }
+    });
+
+    // Fetch reporter names for each report
+    const reportsWithNames = await Promise.all(reports.map(async (report: any) => {
+      let reporterName = 'Unknown';
+      let reportedUserName = null;
+
+      // Get reporter name
+      if (report.reporterType === 'CLIENT') {
+        const client = await prisma.client.findUnique({
+          where: { id: report.reporterId },
+          select: { firstName: true, lastName: true }
+        });
+        if (client) reporterName = `${client.firstName} ${client.lastName}`;
+      } else if (report.reporterType === 'CONTRACTOR') {
+        const contractor = await prisma.contractor.findUnique({
+          where: { id: report.reporterId },
+          select: { name: true }
+        });
+        if (contractor) reporterName = contractor.name;
+      }
+
+      // Get reported user name if applicable
+      if (report.reportedUserId) {
+        if (report.reportedUserType === 'CLIENT') {
+          const client = await prisma.client.findUnique({
+            where: { id: report.reportedUserId },
+            select: { firstName: true, lastName: true }
+          });
+          if (client) reportedUserName = `${client.firstName} ${client.lastName}`;
+        } else if (report.reportedUserType === 'CONTRACTOR') {
+          const contractor = await prisma.contractor.findUnique({
+            where: { id: report.reportedUserId },
+            select: { name: true }
+          });
+          if (contractor) reportedUserName = contractor.name;
+        }
+      }
+
+      return {
+        ...report,
+        reporterName,
+        reportedUserName
+      };
+    }));
+
+    return c.json({
+      success: true,
+      reports: reportsWithNames
+    });
+  } catch (error) {
+    console.error('Error fetching reports:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch reports'
+    }, 500);
+  }
+});
+
+// Get single report by ID
+admin.get('/admin/reports/:id', async (c) => {
+  try {
+    const prisma = c.get('prisma') as any;
+    const id = parseInt(c.req.param('id'));
+
+    const report = await prisma.report.findUnique({
+      where: { id },
+      include: {
+        booking: {
+          include: {
+            contractor: {
+              select: { id: true, name: true, email: true, phone: true }
+            },
+            client: {
+              select: { id: true, firstName: true, lastName: true, email: true, phone: true }
+            },
+            service: {
+              select: { id: true, name: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!report) {
+      return c.json({
+        success: false,
+        error: 'Report not found'
+      }, 404);
+    }
+
+    // Get reporter details
+    let reporter = null;
+    if (report.reporterType === 'CLIENT') {
+      reporter = await prisma.client.findUnique({
+        where: { id: report.reporterId },
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true }
+      });
+    } else if (report.reporterType === 'CONTRACTOR') {
+      reporter = await prisma.contractor.findUnique({
+        where: { id: report.reporterId },
+        select: { id: true, name: true, email: true, phone: true }
+      });
+    }
+
+    // Get reported user details if applicable
+    let reportedUser = null;
+    if (report.reportedUserId) {
+      if (report.reportedUserType === 'CLIENT') {
+        reportedUser = await prisma.client.findUnique({
+          where: { id: report.reportedUserId },
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true }
+        });
+      } else if (report.reportedUserType === 'CONTRACTOR') {
+        reportedUser = await prisma.contractor.findUnique({
+          where: { id: report.reportedUserId },
+          select: { id: true, name: true, email: true, phone: true }
+        });
+      }
+    }
+
+    return c.json({
+      success: true,
+      report: {
+        ...report,
+        reporter,
+        reportedUser
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching report:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch report'
+    }, 500);
+  }
+});
+
+// Update report status/resolution
+admin.patch('/admin/reports/:id', async (c) => {
+  try {
+    const prisma = c.get('prisma') as any;
+    const id = parseInt(c.req.param('id'));
+    const body = await c.req.json();
+
+    const { status, priority, resolution, assignedTo } = body;
+
+    const updateData: any = {};
+    if (status) updateData.status = status;
+    if (priority) updateData.priority = priority;
+    if (resolution !== undefined) updateData.resolution = resolution;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
+
+    // If resolving, set resolvedAt
+    if (status === 'RESOLVED' || status === 'DISMISSED') {
+      updateData.resolvedAt = new Date();
+    }
+
+    const report = await prisma.report.update({
+      where: { id },
+      data: updateData
+    });
+
+    return c.json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    console.error('Error updating report:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to update report'
+    }, 500);
+  }
+});
+
+// Get report statistics
+admin.get('/admin/reports/stats', async (c) => {
+  try {
+    const prisma = c.get('prisma') as any;
+
+    const [
+      totalReports,
+      pendingCount,
+      underReviewCount,
+      resolvedCount,
+      dismissedCount,
+      byType,
+      byPriority
+    ] = await Promise.all([
+      prisma.report.count(),
+      prisma.report.count({ where: { status: 'PENDING' } }),
+      prisma.report.count({ where: { status: 'UNDER_REVIEW' } }),
+      prisma.report.count({ where: { status: 'RESOLVED' } }),
+      prisma.report.count({ where: { status: 'DISMISSED' } }),
+      prisma.report.groupBy({
+        by: ['type'],
+        _count: { type: true }
+      }),
+      prisma.report.groupBy({
+        by: ['priority'],
+        _count: { priority: true }
+      })
+    ]);
+
+    return c.json({
+      success: true,
+      stats: {
+        total: totalReports,
+        byStatus: {
+          pending: pendingCount,
+          underReview: underReviewCount,
+          resolved: resolvedCount,
+          dismissed: dismissedCount
+        },
+        byType: byType.reduce((acc: any, item: any) => {
+          acc[item.type] = item._count.type;
+          return acc;
+        }, {}),
+        byPriority: byPriority.reduce((acc: any, item: any) => {
+          acc[item.priority] = item._count.priority;
+          return acc;
+        }, {})
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching report stats:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch report statistics'
+    }, 500);
+  }
+});
+
+// Create a new report (for testing or manual admin creation)
+admin.post('/admin/reports', async (c) => {
+  try {
+    const prisma = c.get('prisma') as any;
+    const body = await c.req.json();
+
+    const {
+      type,
+      reporterType,
+      reporterId,
+      reportedUserId,
+      reportedUserType,
+      bookingId,
+      reason,
+      description,
+      evidence,
+      priority
+    } = body;
+
+    const report = await prisma.report.create({
+      data: {
+        type,
+        reporterType,
+        reporterId,
+        reportedUserId: reportedUserId || null,
+        reportedUserType: reportedUserType || null,
+        bookingId: bookingId || null,
+        reason,
+        description,
+        evidence: evidence ? JSON.stringify(evidence) : null,
+        priority: priority || 'MEDIUM',
+        status: 'PENDING'
+      }
+    });
+
+    return c.json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    console.error('Error creating report:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to create report'
+    }, 500);
+  }
+});
+
+// Delete a report
+admin.delete('/admin/reports/:id', async (c) => {
+  try {
+    const prisma = c.get('prisma') as any;
+    const id = parseInt(c.req.param('id'));
+
+    await prisma.report.delete({
+      where: { id }
+    });
+
+    return c.json({
+      success: true,
+      message: 'Report deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to delete report'
+    }, 500);
+  }
+});
+
 export default admin;

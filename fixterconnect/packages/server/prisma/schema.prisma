@@ -275,6 +275,7 @@ model Booking {
   photos         JobPhoto[]
   invoice        Invoice?
   payments       Payment[]
+  reports        Report[]
 
   @@index([contractorId])
   @@index([clientId])
@@ -411,6 +412,73 @@ enum FlagStatus {
   REVIEWED
   RESOLVED
   DISMISSED
+}
+
+// ============================================
+// USER REPORTS
+// ============================================
+
+model Report {
+  id              Int          @id @default(autoincrement())
+  type            ReportType
+  reporterType    ReporterType @map("reporter_type")
+  reporterId      Int          @map("reporter_id")
+
+  // Who is being reported (if applicable)
+  reportedUserId  Int?         @map("reported_user_id")
+  reportedUserType ReporterType? @map("reported_user_type")
+
+  // Related booking (for booking/payment disputes)
+  bookingId       Int?         @map("booking_id")
+
+  reason          String
+  description     String       @db.Text
+  evidence        String?      @db.Text // JSON array of image URLs or file paths
+
+  status          ReportStatus @default(PENDING)
+  priority        ReportPriority @default(MEDIUM)
+
+  // Admin handling
+  assignedTo      Int?         @map("assigned_to")
+  resolution      String?      @db.Text
+  resolvedAt      DateTime?    @map("resolved_at")
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  booking         Booking?     @relation(fields: [bookingId], references: [id])
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+enum ReportType {
+  USER_PROFILE     // Reports about contractor or client profiles
+  BOOKING_DISPUTE  // Issues with bookings, cancellations, or no-shows
+  PAYMENT_DISPUTE  // Payment issues, refunds, or billing problems
+  PLATFORM_ABUSE   // Spam, fake accounts, or fraudulent activity
+}
+
+enum ReporterType {
+  CLIENT
+  CONTRACTOR
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 // ============================================

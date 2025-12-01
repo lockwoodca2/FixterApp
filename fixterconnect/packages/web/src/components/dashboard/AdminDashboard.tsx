@@ -73,14 +73,36 @@ interface FlaggedMessage {
   };
 }
 
+type ReportType = 'USER_PROFILE' | 'BOOKING_DISPUTE' | 'PAYMENT_DISPUTE' | 'PLATFORM_ABUSE';
+type ReportStatus = 'PENDING' | 'UNDER_REVIEW' | 'RESOLVED' | 'DISMISSED';
+type ReportPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
 interface Report {
   id: number;
-  reportedBy: string;
-  reportedUser: string;
+  type: ReportType;
+  reporterType: 'CLIENT' | 'CONTRACTOR';
+  reporterId: number;
+  reporterName: string;
+  reportedUserId: number | null;
+  reportedUserType: 'CLIENT' | 'CONTRACTOR' | null;
+  reportedUserName: string | null;
+  bookingId: number | null;
   reason: string;
   description: string;
-  timestamp: string;
-  status: 'pending' | 'reviewed' | 'resolved';
+  evidence: string | null;
+  status: ReportStatus;
+  priority: ReportPriority;
+  assignedTo: number | null;
+  resolution: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  booking?: {
+    id: number;
+    contractor: { id: number; name: string };
+    client: { id: number; firstName: string; lastName: string };
+    service: { id: number; name: string };
+  };
 }
 
 interface ActivityLog {
@@ -124,7 +146,11 @@ const AdminDashboard: React.FC = () => {
   const [actionNote, setActionNote] = useState('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmAction, setConfirmAction] = useState<string>('');
-  const [reports] = useState<Report[]>([]); // Keep empty for now
+  const [reports, setReports] = useState<Report[]>([]);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportFilter, setReportFilter] = useState<{ type: ReportType | 'ALL'; status: ReportStatus | 'ALL' }>({ type: 'ALL', status: 'ALL' });
+  const [reportResolution, setReportResolution] = useState('');
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
   // Service Areas state
@@ -202,6 +228,13 @@ const AdminDashboard: React.FC = () => {
       const languagesData = await languagesResponse.json();
       if (languagesData.success) {
         setLanguages(languagesData.languages);
+      }
+
+      // Fetch reports
+      const reportsResponse = await fetch(`${API_BASE_URL}/admin/reports`);
+      const reportsData = await reportsResponse.json();
+      if (reportsData.success) {
+        setReports(reportsData.reports);
       }
 
     } catch (error) {
@@ -834,6 +867,78 @@ const AdminDashboard: React.FC = () => {
     );
   };
 
+  // Helper functions for reports
+  const getReportTypeLabel = (type: ReportType) => {
+    const labels: Record<ReportType, string> = {
+      USER_PROFILE: 'User Profile',
+      BOOKING_DISPUTE: 'Booking Dispute',
+      PAYMENT_DISPUTE: 'Payment Dispute',
+      PLATFORM_ABUSE: 'Platform Abuse'
+    };
+    return labels[type];
+  };
+
+  const getReportTypeColor = (type: ReportType) => {
+    const colors: Record<ReportType, { bg: string; text: string }> = {
+      USER_PROFILE: { bg: '#dbeafe', text: '#1e40af' },
+      BOOKING_DISPUTE: { bg: '#fef3c7', text: '#92400e' },
+      PAYMENT_DISPUTE: { bg: '#fce7f3', text: '#9d174d' },
+      PLATFORM_ABUSE: { bg: '#fee2e2', text: '#991b1b' }
+    };
+    return colors[type];
+  };
+
+  const getReportStatusColor = (status: ReportStatus) => {
+    const colors: Record<ReportStatus, { bg: string; text: string }> = {
+      PENDING: { bg: '#fef3c7', text: '#92400e' },
+      UNDER_REVIEW: { bg: '#dbeafe', text: '#1e40af' },
+      RESOLVED: { bg: '#dcfce7', text: '#166534' },
+      DISMISSED: { bg: '#f1f5f9', text: '#475569' }
+    };
+    return colors[status];
+  };
+
+  const getPriorityColor = (priority: ReportPriority) => {
+    const colors: Record<ReportPriority, { bg: string; text: string }> = {
+      LOW: { bg: '#f1f5f9', text: '#475569' },
+      MEDIUM: { bg: '#dbeafe', text: '#1e40af' },
+      HIGH: { bg: '#fef3c7', text: '#92400e' },
+      URGENT: { bg: '#fee2e2', text: '#991b1b' }
+    };
+    return colors[priority];
+  };
+
+  const handleUpdateReport = async (reportId: number, updates: { status?: ReportStatus; priority?: ReportPriority; resolution?: string }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+
+      if (response.ok) {
+        showToast('Report updated successfully', 'success');
+        fetchAdminData();
+        if (updates.status === 'RESOLVED' || updates.status === 'DISMISSED') {
+          setShowReportModal(false);
+          setSelectedReport(null);
+          setReportResolution('');
+        }
+      } else {
+        showToast('Failed to update report', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating report:', error);
+      showToast('Error updating report', 'error');
+    }
+  };
+
+  const filteredReports = reports.filter(report => {
+    if (reportFilter.type !== 'ALL' && report.type !== reportFilter.type) return false;
+    if (reportFilter.status !== 'ALL' && report.status !== reportFilter.status) return false;
+    return true;
+  });
+
   // Reports & Flags Section
   const renderReports = () => (
     <div>
@@ -850,162 +955,476 @@ const AdminDashboard: React.FC = () => {
         color: '#64748b',
         marginBottom: '24px'
       }}>
-        Review other types of user reports and violations
+        Review user reports and violations
       </p>
 
+      {/* Filters */}
       <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '64px 48px',
-        textAlign: 'center',
-        border: '2px dashed #e2e8f0'
+        display: 'flex',
+        gap: '16px',
+        marginBottom: '24px',
+        flexWrap: 'wrap'
       }}>
-        <AlertTriangle
-          size={64}
-          style={{
-            color: '#cbd5e1',
-            margin: '0 auto 24px',
-            display: 'block'
-          }}
-        />
+        <div>
+          <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+            Type
+          </label>
+          <select
+            value={reportFilter.type}
+            onChange={(e) => setReportFilter(prev => ({ ...prev, type: e.target.value as ReportType | 'ALL' }))}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              fontSize: '14px',
+              minWidth: '160px'
+            }}
+          >
+            <option value="ALL">All Types</option>
+            <option value="USER_PROFILE">User Profile</option>
+            <option value="BOOKING_DISPUTE">Booking Dispute</option>
+            <option value="PAYMENT_DISPUTE">Payment Dispute</option>
+            <option value="PLATFORM_ABUSE">Platform Abuse</option>
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: '13px', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+            Status
+          </label>
+          <select
+            value={reportFilter.status}
+            onChange={(e) => setReportFilter(prev => ({ ...prev, status: e.target.value as ReportStatus | 'ALL' }))}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0',
+              fontSize: '14px',
+              minWidth: '160px'
+            }}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="UNDER_REVIEW">Under Review</option>
+            <option value="RESOLVED">Resolved</option>
+            <option value="DISMISSED">Dismissed</option>
+          </select>
+        </div>
+      </div>
 
-        <h3 style={{
-          fontSize: '20px',
-          fontWeight: 'bold',
-          color: '#1e293b',
-          margin: 0,
-          marginBottom: '12px'
-        }}>
-          Coming Soon
-        </h3>
-
-        <p style={{
-          fontSize: '15px',
-          color: '#64748b',
-          margin: 0,
-          marginBottom: '24px',
-          maxWidth: '600px',
-          marginLeft: 'auto',
-          marginRight: 'auto',
-          lineHeight: '1.6'
-        }}>
-          This section will allow you to review and manage other types of reports including:
-        </p>
-
+      {/* Stats Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '16px',
-          maxWidth: '700px',
-          margin: '0 auto',
-          textAlign: 'left'
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Total Reports</p>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e293b', margin: '4px 0 0' }}>
+            {reports.length}
+          </p>
+        </div>
+        <div style={{
+          backgroundColor: '#fef3c7',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #fcd34d'
+        }}>
+          <p style={{ fontSize: '13px', color: '#92400e', margin: 0 }}>Pending</p>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#92400e', margin: '4px 0 0' }}>
+            {reports.filter(r => r.status === 'PENDING').length}
+          </p>
+        </div>
+        <div style={{
+          backgroundColor: '#dbeafe',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #93c5fd'
+        }}>
+          <p style={{ fontSize: '13px', color: '#1e40af', margin: 0 }}>Under Review</p>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#1e40af', margin: '4px 0 0' }}>
+            {reports.filter(r => r.status === 'UNDER_REVIEW').length}
+          </p>
+        </div>
+        <div style={{
+          backgroundColor: '#dcfce7',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #86efac'
+        }}>
+          <p style={{ fontSize: '13px', color: '#166534', margin: 0 }}>Resolved</p>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#166534', margin: '4px 0 0' }}>
+            {reports.filter(r => r.status === 'RESOLVED').length}
+          </p>
+        </div>
+      </div>
+
+      {/* Reports List */}
+      {filteredReports.length > 0 ? (
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          overflow: 'hidden'
+        }}>
+          {filteredReports.map((report, index) => (
+            <div
+              key={report.id}
+              onClick={() => {
+                setSelectedReport(report);
+                setShowReportModal(true);
+                setReportResolution(report.resolution || '');
+              }}
+              style={{
+                padding: '20px 24px',
+                borderBottom: index < filteredReports.length - 1 ? '1px solid #e2e8f0' : 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{
+                    padding: '4px 10px',
+                    backgroundColor: getReportTypeColor(report.type).bg,
+                    color: getReportTypeColor(report.type).text,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {getReportTypeLabel(report.type)}
+                  </span>
+                  <span style={{
+                    padding: '4px 10px',
+                    backgroundColor: getPriorityColor(report.priority).bg,
+                    color: getPriorityColor(report.priority).text,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {report.priority}
+                  </span>
+                </div>
+                <span style={{
+                  padding: '4px 10px',
+                  backgroundColor: getReportStatusColor(report.status).bg,
+                  color: getReportStatusColor(report.status).text,
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}>
+                  {report.status.replace('_', ' ')}
+                </span>
+              </div>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: '0 0 8px' }}>
+                {report.reason}
+              </h4>
+              <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 12px', lineHeight: '1.5' }}>
+                {report.description.length > 150 ? report.description.substring(0, 150) + '...' : report.description}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>
+                  Reported by: <strong>{report.reporterName}</strong> ({report.reporterType.toLowerCase()})
+                  {report.reportedUserName && (
+                    <> • Against: <strong>{report.reportedUserName}</strong></>
+                  )}
+                </p>
+                <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>
+                  {new Date(report.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          padding: '64px 48px',
+          textAlign: 'center',
+          border: '2px dashed #e2e8f0'
+        }}>
+          <AlertTriangle
+            size={48}
+            style={{
+              color: '#cbd5e1',
+              margin: '0 auto 16px',
+              display: 'block'
+            }}
+          />
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#1e293b',
+            margin: 0,
+            marginBottom: '8px'
+          }}>
+            No Reports Found
+          </h3>
+          <p style={{
+            fontSize: '14px',
+            color: '#64748b',
+            margin: 0
+          }}>
+            {reportFilter.type !== 'ALL' || reportFilter.status !== 'ALL'
+              ? 'No reports match your current filters.'
+              : 'No user reports have been submitted yet.'}
+          </p>
+        </div>
+      )}
+
+      {/* Report Detail Modal */}
+      {showReportModal && selectedReport && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
         }}>
           <div style={{
-            padding: '16px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '700px',
+            width: '90%',
+            maxHeight: '85vh',
+            overflowY: 'auto'
           }}>
-            <h4 style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#1e293b',
-              margin: 0,
-              marginBottom: '4px'
-            }}>
-              User Profile Reports
-            </h4>
-            <p style={{
-              fontSize: '13px',
-              color: '#64748b',
-              margin: 0
-            }}>
-              Reports about contractor or client profiles
-            </p>
-          </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+              <div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{
+                    padding: '4px 10px',
+                    backgroundColor: getReportTypeColor(selectedReport.type).bg,
+                    color: getReportTypeColor(selectedReport.type).text,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {getReportTypeLabel(selectedReport.type)}
+                  </span>
+                  <span style={{
+                    padding: '4px 10px',
+                    backgroundColor: getPriorityColor(selectedReport.priority).bg,
+                    color: getPriorityColor(selectedReport.priority).text,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {selectedReport.priority}
+                  </span>
+                  <span style={{
+                    padding: '4px 10px',
+                    backgroundColor: getReportStatusColor(selectedReport.status).bg,
+                    color: getReportStatusColor(selectedReport.status).text,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {selectedReport.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                  Report #{selectedReport.id}
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowReportModal(false);
+                  setSelectedReport(null);
+                  setReportResolution('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '8px'
+                }}
+              >
+                <X size={24} color="#64748b" />
+              </button>
+            </div>
 
-          <div style={{
-            padding: '16px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
-          }}>
-            <h4 style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#1e293b',
-              margin: 0,
-              marginBottom: '4px'
-            }}>
-              Booking Disputes
-            </h4>
-            <p style={{
-              fontSize: '13px',
-              color: '#64748b',
-              margin: 0
-            }}>
-              Issues with bookings, cancellations, or no-shows
-            </p>
-          </div>
+            {/* Report Details */}
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', margin: '0 0 8px', textTransform: 'uppercase' }}>
+                Reason
+              </h3>
+              <p style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', margin: 0 }}>
+                {selectedReport.reason}
+              </p>
+            </div>
 
-          <div style={{
-            padding: '16px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
-          }}>
-            <h4 style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#1e293b',
-              margin: 0,
-              marginBottom: '4px'
-            }}>
-              Payment Disputes
-            </h4>
-            <p style={{
-              fontSize: '13px',
-              color: '#64748b',
-              margin: 0
-            }}>
-              Payment issues, refunds, or billing problems
-            </p>
-          </div>
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', margin: '0 0 8px', textTransform: 'uppercase' }}>
+                Description
+              </h3>
+              <p style={{ fontSize: '15px', color: '#475569', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                {selectedReport.description}
+              </p>
+            </div>
 
-          <div style={{
-            padding: '16px',
-            backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
-          }}>
-            <h4 style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#1e293b',
-              margin: 0,
-              marginBottom: '4px'
-            }}>
-              Platform Abuse
-            </h4>
-            <p style={{
-              fontSize: '13px',
-              color: '#64748b',
-              margin: 0
-            }}>
-              Spam, fake accounts, or fraudulent activity
-            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', margin: '0 0 8px', textTransform: 'uppercase' }}>
+                  Reporter
+                </h3>
+                <p style={{ fontSize: '15px', color: '#1e293b', margin: 0 }}>
+                  {selectedReport.reporterName}
+                </p>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>
+                  {selectedReport.reporterType}
+                </p>
+              </div>
+              {selectedReport.reportedUserName && (
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', margin: '0 0 8px', textTransform: 'uppercase' }}>
+                    Reported User
+                  </h3>
+                  <p style={{ fontSize: '15px', color: '#1e293b', margin: 0 }}>
+                    {selectedReport.reportedUserName}
+                  </p>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>
+                    {selectedReport.reportedUserType}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {selectedReport.booking && (
+              <div style={{
+                backgroundColor: '#f8fafc',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
+              }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', margin: '0 0 12px', textTransform: 'uppercase' }}>
+                  Related Booking
+                </h3>
+                <p style={{ fontSize: '15px', color: '#1e293b', margin: '0 0 4px' }}>
+                  <strong>Service:</strong> {selectedReport.booking.service.name}
+                </p>
+                <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+                  {selectedReport.booking.client.firstName} {selectedReport.booking.client.lastName} ↔ {selectedReport.booking.contractor.name}
+                </p>
+              </div>
+            )}
+
+            <div style={{ marginBottom: '24px' }}>
+              <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0 }}>
+                Submitted: {new Date(selectedReport.createdAt).toLocaleString()}
+                {selectedReport.resolvedAt && (
+                  <> • Resolved: {new Date(selectedReport.resolvedAt).toLocaleString()}</>
+                )}
+              </p>
+            </div>
+
+            {/* Actions */}
+            {selectedReport.status !== 'RESOLVED' && selectedReport.status !== 'DISMISSED' && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', display: 'block', marginBottom: '8px' }}>
+                    Resolution Notes
+                  </label>
+                  <textarea
+                    value={reportResolution}
+                    onChange={(e) => setReportResolution(e.target.value)}
+                    placeholder="Add notes about how this report was handled..."
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                      minHeight: '100px'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  {selectedReport.status === 'PENDING' && (
+                    <button
+                      onClick={() => handleUpdateReport(selectedReport.id, { status: 'UNDER_REVIEW' })}
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                        backgroundColor: 'white',
+                        color: '#1e40af',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Start Review
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleUpdateReport(selectedReport.id, { status: 'RESOLVED', resolution: reportResolution })}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: '#10b981',
+                      color: 'white',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Mark Resolved
+                  </button>
+                  <button
+                    onClick={() => handleUpdateReport(selectedReport.id, { status: 'DISMISSED', resolution: reportResolution })}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                      backgroundColor: 'white',
+                      color: '#64748b',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </>
+            )}
+
+            {selectedReport.resolution && (
+              <div style={{
+                backgroundColor: '#f0fdf4',
+                borderRadius: '8px',
+                padding: '16px',
+                marginTop: '16px'
+              }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: '#166534', margin: '0 0 8px' }}>
+                  Resolution
+                </h3>
+                <p style={{ fontSize: '14px', color: '#166534', margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {selectedReport.resolution}
+                </p>
+              </div>
+            )}
           </div>
         </div>
-
-        <p style={{
-          fontSize: '13px',
-          color: '#94a3b8',
-          margin: '32px 0 0 0',
-          fontStyle: 'italic'
-        }}>
-          Note: For flagged messages, please use the "Message Monitoring" section.
-        </p>
-      </div>
+      )}
     </div>
   );
 
