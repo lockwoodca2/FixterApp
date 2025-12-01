@@ -246,26 +246,16 @@ const ContractorDashboard: React.FC = () => {
     };
     payments: Array<{
       id: number;
-      amount: number;
+      date: string;
+      clientName: string;
+      serviceName: string;
+      grossAmount: number;
       platformFee: number;
-      contractorPayout: number;
-      status: string;
-      createdAt: string;
-      invoice: {
-        id: number;
-        totalAmount: number;
-        booking: {
-          service: { name: string };
-          client: { firstName: string; lastName: string };
-        };
-      };
+      netAmount: number;
+      invoiceId: number | null;
+      bookingId: number;
     }>;
-    monthlyBreakdown: Array<{
-      month: string;
-      earnings: number;
-      fees: number;
-      count: number;
-    }>;
+    monthlyBreakdown: { [key: string]: number };
   } | null>(null);
   const [earningsLoading, setEarningsLoading] = useState(false);
 
@@ -4530,33 +4520,19 @@ const ContractorDashboard: React.FC = () => {
                 >
                   <div>
                     <p style={{ fontSize: '15px', fontWeight: '600', color: '#1e293b', marginBottom: '4px' }}>
-                      {payment.invoice?.booking?.service?.name || 'Service'}
+                      {payment.serviceName || 'Service'}
                     </p>
                     <p style={{ fontSize: '13px', color: '#64748b' }}>
-                      {payment.invoice?.booking?.client
-                        ? `${payment.invoice.booking.client.firstName} ${payment.invoice.booking.client.lastName}`
-                        : 'Client'} • {new Date(payment.createdAt).toLocaleDateString()}
+                      {payment.clientName || 'Client'} • {new Date(payment.date).toLocaleDateString()}
                     </p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#059669' }}>
-                      ${payment.contractorPayout.toFixed(2)}
+                      ${(payment.netAmount || 0).toFixed(2)}
                     </p>
                     <p style={{ fontSize: '12px', color: '#94a3b8' }}>
-                      Fee: ${payment.platformFee.toFixed(2)}
+                      Fee: ${(payment.platformFee || 0).toFixed(2)}
                     </p>
-                    <span style={{
-                      display: 'inline-block',
-                      marginTop: '4px',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      backgroundColor: payment.status === 'SUCCEEDED' ? '#dcfce7' : '#fef3c7',
-                      color: payment.status === 'SUCCEEDED' ? '#166534' : '#92400e'
-                    }}>
-                      {payment.status}
-                    </span>
                   </div>
                 </div>
               ))}
