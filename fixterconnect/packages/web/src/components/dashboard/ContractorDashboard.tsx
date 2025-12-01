@@ -4601,8 +4601,17 @@ const ContractorDashboard: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/stripe/earnings/${user.id}`);
       const data = await response.json();
 
-      if (data.success) {
-        setEarnings(data);
+      if (data.success && data.earnings) {
+        setEarnings({
+          summary: {
+            totalEarnings: data.earnings.summary.totalEarnings || 0,
+            platformFees: data.earnings.summary.totalPlatformFees || 0,
+            paymentCount: data.earnings.summary.paymentCount || 0,
+            pendingAmount: data.earnings.summary.pendingAmount || 0,
+          },
+          payments: data.earnings.payments || [],
+          monthlyBreakdown: data.earnings.monthlyBreakdown || {}
+        });
       } else {
         console.error('Error fetching earnings:', data.error);
       }
