@@ -15,18 +15,29 @@ datasource db {
 // ============================================
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String   // bcrypt hashed
-  type      UserType
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           Int          @id @default(autoincrement())
+  username     String       @unique
+  password     String       // bcrypt hashed (empty for OAuth users)
+  type         UserType
+  authProvider AuthProvider @default(EMAIL) @map("auth_provider")
+  googleId     String?      @unique @map("google_id")
+  facebookId   String?      @unique @map("facebook_id")
+  phoneNumber  String?      @unique @map("phone_number")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
 
   // Relations
   client     Client?
   contractor Contractor?
 
   @@map("users")
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  FACEBOOK
+  PHONE
 }
 
 enum UserType {

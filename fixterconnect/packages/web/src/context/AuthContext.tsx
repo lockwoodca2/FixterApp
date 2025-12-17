@@ -11,6 +11,7 @@ interface AuthContextType {
   user: User | null;
   userType: 'contractor' | 'client' | null;
   login: (username: string, password: string) => Promise<User | null>;
+  loginWithGoogle: (credential: string, accountType?: 'client' | 'contractor') => Promise<{ user: User | null; isNewUser: boolean }>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -88,6 +89,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const loginWithGoogle = async (credential: string, accountType?: 'client' | 'contractor'): Promise<{ user: User | null; isNewUser: boolean }> => {
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ credential, accountType })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.user) {
+        const loggedInUser: User = {
+          ...data.user,
+          type: data.userType as 'contractor' | 'client'
+        };
+        setUser(loggedInUser);
+        setUserType(data.userType);
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
+        localStorage.setItem('userType', data.userType);
+        return { user: loggedInUser, isNewUser: data.isNewUser };
+      }
+
+      return { user: null, isNewUser: false };
+    } catch (error) {
+      console.error('Google login error:', error);
+      return { user: null, isNewUser: false };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setUserType(null);
@@ -101,6 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     userType,
     login,
+    loginWithGoogle,
     logout,
     isLoading
   };

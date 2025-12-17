@@ -8,7 +8,9 @@
       "Bash(curl:*)",
       "Bash(node:*)",
       "Bash(npx prisma db push:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
