@@ -5350,7 +5350,7 @@ const ContractorDashboard: React.FC = () => {
           { id: 'areas' as const, label: 'Service Areas' },
           { id: 'materials' as const, label: 'Materials Library' },
           { id: 'subscription' as const, label: 'Subscription' },
-          { id: 'booking-page' as const, label: 'Booking Page' }
+          { id: 'booking-page' as const, label: 'Customizations' }
         ].map(tab => (
           <button
             key={tab.id}
