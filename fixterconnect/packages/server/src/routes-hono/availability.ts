@@ -449,4 +449,97 @@ availability.get('/availability/contractor/:contractorId/overrides', async (c) =
   }
 });
 
+// POST /api/availability/cleanup - Delete old date overrides (90+ days old)
+// This endpoint should be called quarterly via a scheduled job
+availability.post('/availability/cleanup', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+
+    // Optional: Add a simple API key check for security
+    const authHeader = c.req.header('X-Cleanup-Key');
+    const expectedKey = c.env?.CLEANUP_API_KEY;
+
+    if (expectedKey && authHeader !== expectedKey) {
+      return c.json({
+        success: false,
+        error: 'Unauthorized'
+      }, 401);
+    }
+
+    // Calculate cutoff date (90 days ago)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    cutoffDate.setHours(23, 59, 59, 999);
+
+    // Delete old date overrides (non-recurring entries with specificDate older than 90 days)
+    const result = await prisma.availability.deleteMany({
+      where: {
+        isRecurring: false,
+        specificDate: {
+          lt: cutoffDate
+        }
+      }
+    });
+
+    console.log(`[Cleanup] Deleted ${result.count} old availability overrides older than ${cutoffDate.toISOString()}`);
+
+    return c.json({
+      success: true,
+      message: `Cleanup complete: deleted ${result.count} old date overrides`,
+      deletedCount: result.count,
+      cutoffDate: cutoffDate.toISOString()
+    });
+  } catch (error) {
+    console.error('Availability cleanup error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to run cleanup'
+    }, 500);
+  }
+});
+
+// GET /api/availability/stats - Get database stats for monitoring
+availability.get('/availability/stats', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+
+    const [totalOverrides, oldOverrides, recurringSchedules] = await Promise.all([
+      // Total non-recurring (date overrides)
+      prisma.availability.count({
+        where: { isRecurring: false }
+      }),
+      // Overrides older than 90 days
+      prisma.availability.count({
+        where: {
+          isRecurring: false,
+          specificDate: {
+            lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+          }
+        }
+      }),
+      // Recurring schedules
+      prisma.availability.count({
+        where: { isRecurring: true }
+      })
+    ]);
+
+    return c.json({
+      success: true,
+      stats: {
+        totalOverrides,
+        oldOverrides,
+        recurringSchedules,
+        totalRows: totalOverrides + recurringSchedules,
+        cleanupPending: oldOverrides
+      }
+    });
+  } catch (error) {
+    console.error('Availability stats error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to fetch stats'
+    }, 500);
+  }
+});
+
 export default availability;

@@ -16,6 +16,11 @@ NODE_ENV = "production"
 binding = "R2_BUCKET"
 bucket_name = "fixterconnect-uploads"
 
+# Scheduled triggers (cron jobs)
+# Quarterly cleanup: runs at midnight on the 1st of Jan, Apr, Jul, Oct
+[triggers]
+crons = ["0 0 1 1,4,7,10 *"]
+
 # Secrets (set via: wrangler secret put SECRET_NAME)
 # Run these commands to set secrets:
 # wrangler secret put DATABASE_URL

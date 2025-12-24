@@ -112,4 +112,36 @@ app.notFound((c) => {
   }, 404);
 });
 
-export default app;
+// Scheduled event handler for cron jobs
+async function scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  console.log(`[Scheduled] Cron triggered at ${new Date().toISOString()}`);
+
+  const prisma = createPrismaClient(env.DATABASE_URL);
+
+  try {
+    // Calculate cutoff date (90 days ago)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    cutoffDate.setHours(23, 59, 59, 999);
+
+    // Delete old date overrides
+    const result = await prisma.availability.deleteMany({
+      where: {
+        isRecurring: false,
+        specificDate: {
+          lt: cutoffDate
+        }
+      }
+    });
+
+    console.log(`[Scheduled] Cleanup complete: deleted ${result.count} old availability overrides older than ${cutoffDate.toISOString()}`);
+  } catch (error) {
+    console.error('[Scheduled] Cleanup error:', error);
+  }
+}
+
+// Export both fetch (HTTP) and scheduled (cron) handlers
+export default {
+  fetch: app.fetch,
+  scheduled
+};
