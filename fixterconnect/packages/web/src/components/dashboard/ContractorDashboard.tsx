@@ -3108,512 +3108,19 @@ const ContractorDashboard: React.FC = () => {
             )}
           </div>
         ) : (
-          // Schedule Tab
+          // Calendar Tab
           <div>
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
-                Schedule Manager
+                Calendar
               </h3>
               <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
-                Manage your availability and working hours
+                View and manage your scheduled jobs
               </p>
             </div>
 
-            {/* Schedule View Tabs */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
-              <button
-                onClick={() => setScheduleView('recurring')}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: scheduleView === 'recurring' ? '#4f46e5' : 'white',
-                  color: scheduleView === 'recurring' ? 'white' : '#64748b',
-                  border: scheduleView === 'recurring' ? 'none' : '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                🔁 Recurring Schedule
-              </button>
-              <button
-                onClick={() => setScheduleView('calendar')}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: scheduleView === 'calendar' ? '#4f46e5' : 'white',
-                  color: scheduleView === 'calendar' ? 'white' : '#64748b',
-                  border: scheduleView === 'calendar' ? 'none' : '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                📅 Calendar View
-              </button>
-            </div>
-
-            {scheduleView === 'recurring' ? (
-              <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', border: '1px solid #e2e8f0' }}>
-                {/* Header */}
-                <div style={{ marginBottom: '24px' }}>
-                  <h4 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
-                    Default Weekly Schedule (Recurring)
-                  </h4>
-                  <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
-                    Set your typical weekly availability. This schedule will repeat every week going forward.
-                  </p>
-
-                  {/* Info Box */}
-                  <div style={{
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    marginBottom: '24px'
-                  }}>
-                    <p style={{ fontSize: '14px', color: '#1e40af', margin: 0 }}>
-                      <strong>How it works:</strong> When you set "Monday 8am-5pm", it applies to <em>every</em> Monday. For vacations or specific dates, you'll be able to add overrides in the Calendar view (coming soon).
-                    </p>
-                  </div>
-                </div>
-
-                {/* Days of the Week */}
-                {Object.entries(weeklySchedule).map(([day, schedule]: [string, any]) => {
-                  const dayName = day.charAt(0).toUpperCase() + day.slice(1);
-                  const hasServiceAreasWarning = schedule.available && schedule.serviceAreas.length === 0;
-
-                  return (
-                    <div
-                      key={day}
-                      style={{
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '24px',
-                        marginBottom: '16px'
-                      }}
-                    >
-                      {/* Day Header with Checkbox */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                        <input
-                          type="checkbox"
-                          checked={schedule.available}
-                          onChange={(e) => {
-                            setWeeklySchedule({
-                              ...weeklySchedule,
-                              [day]: { ...schedule, available: e.target.checked }
-                            });
-                          }}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            cursor: 'pointer',
-                            accentColor: '#4f46e5'
-                          }}
-                        />
-                        <h5 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
-                          {dayName}
-                        </h5>
-                        <span style={{
-                          fontSize: '14px',
-                          color: schedule.available ? '#10b981' : '#94a3b8',
-                          fontWeight: '600'
-                        }}>
-                          {schedule.available ? 'Available' : 'Unavailable'}
-                        </span>
-                      </div>
-
-                      {schedule.available ? (
-                        <div>
-                          {/* Time Range */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                            <input
-                              type="time"
-                              value={schedule.startTime}
-                              onChange={(e) => {
-                                setWeeklySchedule({
-                                  ...weeklySchedule,
-                                  [day]: { ...schedule, startTime: e.target.value }
-                                });
-                              }}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                fontFamily: 'inherit'
-                              }}
-                            />
-
-                            <span style={{ color: '#64748b', fontWeight: '600' }}>to</span>
-
-                            <input
-                              type="time"
-                              value={schedule.endTime}
-                              onChange={(e) => {
-                                setWeeklySchedule({
-                                  ...weeklySchedule,
-                                  [day]: { ...schedule, endTime: e.target.value }
-                                });
-                              }}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                fontFamily: 'inherit'
-                              }}
-                            />
-                          </div>
-
-                          {/* Max Jobs */}
-                          <div style={{ marginBottom: '20px' }}>
-                            <label style={{
-                              display: 'block',
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              color: '#1e293b',
-                              marginBottom: '8px'
-                            }}>
-                              Max Jobs Per Day:
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="20"
-                              value={schedule.maxJobs}
-                              onChange={(e) => {
-                                setWeeklySchedule({
-                                  ...weeklySchedule,
-                                  [day]: { ...schedule, maxJobs: parseInt(e.target.value) || 0 }
-                                });
-                              }}
-                              style={{
-                                width: '100px',
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                fontFamily: 'inherit'
-                              }}
-                            />
-                            <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '12px' }}>
-                              (How many jobs you can complete every {dayName})
-                            </span>
-                          </div>
-
-                          {/* Service Areas */}
-                          <div>
-                            <label style={{
-                              display: 'block',
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              color: '#1e293b',
-                              marginBottom: '8px'
-                            }}>
-                              Service Areas (every {dayName}):
-                            </label>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                              {serviceAreasList.map(area => (
-                                <button
-                                  key={area}
-                                  onClick={() => {
-                                    const isSelected = schedule.serviceAreas.includes(area);
-                                    setWeeklySchedule({
-                                      ...weeklySchedule,
-                                      [day]: {
-                                        ...schedule,
-                                        serviceAreas: isSelected
-                                          ? schedule.serviceAreas.filter((a: string) => a !== area)
-                                          : [...schedule.serviceAreas, area]
-                                      }
-                                    });
-                                  }}
-                                  style={{
-                                    padding: '8px 16px',
-                                    backgroundColor: schedule.serviceAreas.includes(area) ? '#4f46e5' : 'white',
-                                    color: schedule.serviceAreas.includes(area) ? 'white' : '#64748b',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '20px',
-                                    fontSize: '14px',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  {area}
-                                </button>
-                              ))}
-                            </div>
-                            {hasServiceAreasWarning && (
-                              <p style={{
-                                fontSize: '13px',
-                                color: '#dc2626',
-                                marginTop: '8px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}>
-                                ⚠️ No service areas selected for this day
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <p style={{ fontSize: '14px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
-                          Unavailable
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Save Button */}
-                <button
-                  onClick={async () => {
-                    if (!user?.id) return;
-
-                    try {
-                      // Convert weeklySchedule to API format
-                      const dayMapping: { [key: string]: number } = {
-                        sunday: 0,
-                        monday: 1,
-                        tuesday: 2,
-                        wednesday: 3,
-                        thursday: 4,
-                        friday: 5,
-                        saturday: 6
-                      };
-
-                      const scheduleData = Object.entries(weeklySchedule)
-                        .filter(([_, schedule]: [string, any]) => schedule.available)
-                        .map(([day, schedule]: [string, any]) => {
-                          // Times are already in 24-hour format
-                          return {
-                            dayOfWeek: dayMapping[day],
-                            startTime: schedule.startTime,
-                            endTime: schedule.endTime,
-                            maxBookings: schedule.maxJobs,
-                            isAvailable: true,
-                            serviceAreas: schedule.serviceAreas
-                          };
-                        });
-
-                      const response = await fetch(`${API_BASE_URL}/availability/contractor/${user.id}/schedule`, {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ schedule: scheduleData })
-                      });
-
-                      const result = await response.json();
-
-                      if (result.success) {
-                        showToast('Schedule saved successfully!', 'success');
-                      } else {
-                        showToast(result.error || 'Failed to save schedule', 'error');
-                      }
-                    } catch (error) {
-                      console.error('Error saving schedule:', error);
-                      showToast('Failed to save schedule', 'error');
-                    }
-                  }}
-                  style={{
-                    padding: '14px 32px',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '15px',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    marginTop: '24px',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  Save Schedule
-                </button>
-
-                {/* Specific Date Overrides Section */}
-                <div style={{
-                  marginTop: '48px',
-                  paddingTop: '32px',
-                  borderTop: '2px solid #e2e8f0'
-                }}>
-                  <h4 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
-                    Specific Date Overrides
-                  </h4>
-                  <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
-                    Override your recurring schedule for specific dates (vacations, holidays, busy days, etc.)
-                  </p>
-
-                  <button
-                    onClick={() => {
-                      setOverrideForm({
-                        isDateRange: false,
-                        specificDate: '',
-                        startDate: '',
-                        endDate: '',
-                        isAvailable: true,
-                        startTime: '08:00',
-                        endTime: '17:00',
-                        maxJobs: 6,
-                        reason: ''
-                      });
-                      setEditingOverrideId(null);
-                      setShowOverrideModal(true);
-                    }}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: '#4f46e5',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    + ADD DATE OVERRIDE
-                  </button>
-
-                  {/* List of existing overrides */}
-                  {dateOverrides.length > 0 && (
-                    <div style={{ marginTop: '24px', display: 'grid', gap: '12px' }}>
-                      {dateOverrides.map((override) => {
-                        const date = new Date(override.specificDate);
-                        const formattedDate = date.toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        });
-
-                        return (
-                          <div
-                            key={override.id}
-                            style={{
-                              backgroundColor: override.isAvailable ? '#f0fdf4' : '#fef2f2',
-                              border: override.isAvailable ? '1px solid #86efac' : '1px solid #fca5a5',
-                              borderRadius: '8px',
-                              padding: '16px',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                                <span style={{
-                                  fontSize: '16px',
-                                  fontWeight: 'bold',
-                                  color: '#1e293b'
-                                }}>
-                                  {formattedDate}
-                                </span>
-                                <span style={{
-                                  padding: '4px 12px',
-                                  borderRadius: '12px',
-                                  fontSize: '12px',
-                                  fontWeight: '600',
-                                  backgroundColor: override.isAvailable ? '#10b981' : '#ef4444',
-                                  color: 'white'
-                                }}>
-                                  {override.isAvailable ? 'Available' : 'Blocked'}
-                                </span>
-                              </div>
-                              {override.isAvailable ? (
-                                <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                                  {override.startTime} - {override.endTime} • Max {override.maxBookings} jobs
-                                </p>
-                              ) : (
-                                <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                                  No bookings accepted
-                                </p>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <button
-                                onClick={async () => {
-                                  if (!user?.id) return;
-
-                                  if (window.confirm(`Delete override for ${formattedDate}?`)) {
-                                    try {
-                                      // Since there's no delete endpoint, we can set isAvailable to match the recurring schedule
-                                      // Or we could add a delete endpoint to the backend
-                                      const response = await fetch(
-                                        `${API_BASE_URL}/availability/contractor/${user.id}/override`,
-                                        {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                            specificDate: override.specificDate,
-                                            isAvailable: false,
-                                            startTime: '00:00',
-                                            endTime: '00:00',
-                                            maxBookings: 0
-                                          })
-                                        }
-                                      );
-
-                                      if (response.ok) {
-                                        // Refresh overrides
-                                        const today = new Date();
-                                        const sixMonthsLater = new Date();
-                                        sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
-
-                                        const overridesResponse = await fetch(
-                                          `${API_BASE_URL}/availability/contractor/${user.id}/overrides?startDate=${today.toISOString().split('T')[0]}&endDate=${sixMonthsLater.toISOString().split('T')[0]}`
-                                        );
-                                        const overridesData = await overridesResponse.json();
-
-                                        if (overridesData.success) {
-                                          setDateOverrides(overridesData.overrides || []);
-                                        }
-
-                                        showToast('Override deleted', 'success');
-                                      }
-                                    } catch (error) {
-                                      console.error('Error deleting override:', error);
-                                      showToast('Failed to delete override', 'error');
-                                    }
-                                  }
-                                }}
-                                style={{
-                                  padding: '8px 16px',
-                                  backgroundColor: '#ef4444',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '13px',
-                                  fontWeight: '600',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              // Calendar View
-              <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', border: '1px solid #e2e8f0' }}>
+            {/* Calendar View */}
+            <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', border: '1px solid #e2e8f0' }}>
                 {/* Calendar Header with Month Navigation */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                   <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
@@ -3825,9 +3332,8 @@ const ContractorDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* Date Override Modal - Available in both tabs */}
+            {/* Date Override Modal */}
             {showOverrideModal && (
               <div style={{
                 position: 'fixed',
@@ -6444,6 +5950,467 @@ const ContractorDashboard: React.FC = () => {
 
     return (
       <div>
+        {/* Availability Section */}
+        <div style={{ marginBottom: '48px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>Availability</h3>
+          <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
+            Set your recurring weekly schedule and availability
+          </p>
+
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '32px', border: '1px solid #e2e8f0' }}>
+            {/* Header */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+                Default Weekly Schedule (Recurring)
+              </h4>
+              <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+                Set your typical weekly availability. This schedule will repeat every week going forward.
+              </p>
+
+              {/* Info Box */}
+              <div style={{
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '24px'
+              }}>
+                <p style={{ fontSize: '14px', color: '#1e40af', margin: 0 }}>
+                  <strong>How it works:</strong> When you set "Monday 8am-5pm", it applies to <em>every</em> Monday. For vacations or specific dates, you'll be able to add overrides in the Calendar view (coming soon).
+                </p>
+              </div>
+            </div>
+
+            {/* Days of the Week */}
+            {Object.entries(weeklySchedule).map(([day, schedule]: [string, any]) => {
+              const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+              const hasServiceAreasWarning = schedule.available && schedule.serviceAreas.length === 0;
+
+              return (
+                <div
+                  key={day}
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '24px',
+                    marginBottom: '16px'
+                  }}
+                >
+                  {/* Day Header with Checkbox */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <input
+                      type="checkbox"
+                      checked={schedule.available}
+                      onChange={(e) => {
+                        setWeeklySchedule({
+                          ...weeklySchedule,
+                          [day]: { ...schedule, available: e.target.checked }
+                        });
+                      }}
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        cursor: 'pointer',
+                        accentColor: '#4f46e5'
+                      }}
+                    />
+                    <h5 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                      {dayName}
+                    </h5>
+                    <span style={{
+                      fontSize: '14px',
+                      color: schedule.available ? '#10b981' : '#94a3b8',
+                      fontWeight: '600'
+                    }}>
+                      {schedule.available ? 'Available' : 'Unavailable'}
+                    </span>
+                  </div>
+
+                  {schedule.available ? (
+                    <div>
+                      {/* Time Range */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <input
+                          type="time"
+                          value={schedule.startTime}
+                          onChange={(e) => {
+                            setWeeklySchedule({
+                              ...weeklySchedule,
+                              [day]: { ...schedule, startTime: e.target.value }
+                            });
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+
+                        <span style={{ color: '#64748b', fontWeight: '600' }}>to</span>
+
+                        <input
+                          type="time"
+                          value={schedule.endTime}
+                          onChange={(e) => {
+                            setWeeklySchedule({
+                              ...weeklySchedule,
+                              [day]: { ...schedule, endTime: e.target.value }
+                            });
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+                      </div>
+
+                      {/* Max Jobs */}
+                      <div style={{ marginBottom: '20px' }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#1e293b',
+                          marginBottom: '8px'
+                        }}>
+                          Max Jobs Per Day:
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={schedule.maxJobs}
+                          onChange={(e) => {
+                            setWeeklySchedule({
+                              ...weeklySchedule,
+                              [day]: { ...schedule, maxJobs: parseInt(e.target.value) || 0 }
+                            });
+                          }}
+                          style={{
+                            width: '100px',
+                            padding: '10px 12px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '14px',
+                            fontFamily: 'inherit'
+                          }}
+                        />
+                        <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '12px' }}>
+                          (How many jobs you can complete every {dayName})
+                        </span>
+                      </div>
+
+                      {/* Service Areas */}
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#1e293b',
+                          marginBottom: '8px'
+                        }}>
+                          Service Areas (every {dayName}):
+                        </label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {serviceAreasList.map(area => (
+                            <button
+                              key={area}
+                              onClick={() => {
+                                const isSelected = schedule.serviceAreas.includes(area);
+                                setWeeklySchedule({
+                                  ...weeklySchedule,
+                                  [day]: {
+                                    ...schedule,
+                                    serviceAreas: isSelected
+                                      ? schedule.serviceAreas.filter((a: string) => a !== area)
+                                      : [...schedule.serviceAreas, area]
+                                  }
+                                });
+                              }}
+                              style={{
+                                padding: '8px 16px',
+                                backgroundColor: schedule.serviceAreas.includes(area) ? '#4f46e5' : 'white',
+                                color: schedule.serviceAreas.includes(area) ? 'white' : '#64748b',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '20px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {area}
+                            </button>
+                          ))}
+                        </div>
+                        {hasServiceAreasWarning && (
+                          <p style={{
+                            fontSize: '13px',
+                            color: '#dc2626',
+                            marginTop: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            ⚠️ No service areas selected for this day
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '14px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>
+                      Unavailable
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Save Button */}
+            <button
+              onClick={async () => {
+                if (!user?.id) return;
+
+                try {
+                  // Convert weeklySchedule to API format
+                  const dayMapping: { [key: string]: number } = {
+                    sunday: 0,
+                    monday: 1,
+                    tuesday: 2,
+                    wednesday: 3,
+                    thursday: 4,
+                    friday: 5,
+                    saturday: 6
+                  };
+
+                  const scheduleData = Object.entries(weeklySchedule)
+                    .filter(([_, schedule]: [string, any]) => schedule.available)
+                    .map(([day, schedule]: [string, any]) => {
+                      // Times are already in 24-hour format
+                      return {
+                        dayOfWeek: dayMapping[day],
+                        startTime: schedule.startTime,
+                        endTime: schedule.endTime,
+                        maxBookings: schedule.maxJobs,
+                        isAvailable: true,
+                        serviceAreas: schedule.serviceAreas
+                      };
+                    });
+
+                  const response = await fetch(`${API_BASE_URL}/availability/contractor/${user.id}/schedule`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ schedule: scheduleData })
+                  });
+
+                  const result = await response.json();
+
+                  if (result.success) {
+                    showToast('Schedule saved successfully!', 'success');
+                  } else {
+                    showToast(result.error || 'Failed to save schedule', 'error');
+                  }
+                } catch (error) {
+                  console.error('Error saving schedule:', error);
+                  showToast('Failed to save schedule', 'error');
+                }
+              }}
+              style={{
+                padding: '14px 32px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                marginTop: '24px',
+                textTransform: 'uppercase'
+              }}
+            >
+              Save Schedule
+            </button>
+
+            {/* Specific Date Overrides Section */}
+            <div style={{
+              marginTop: '48px',
+              paddingTop: '32px',
+              borderTop: '2px solid #e2e8f0'
+            }}>
+              <h4 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>
+                Specific Date Overrides
+              </h4>
+              <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+                Override your recurring schedule for specific dates (vacations, holidays, busy days, etc.)
+              </p>
+
+              <button
+                onClick={() => {
+                  setOverrideForm({
+                    isDateRange: false,
+                    specificDate: '',
+                    startDate: '',
+                    endDate: '',
+                    isAvailable: true,
+                    startTime: '08:00',
+                    endTime: '17:00',
+                    maxJobs: 6,
+                    reason: ''
+                  });
+                  setEditingOverrideId(null);
+                  setShowOverrideModal(true);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#4f46e5',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                + ADD DATE OVERRIDE
+              </button>
+
+              {/* List of existing overrides */}
+              {dateOverrides.length > 0 && (
+                <div style={{ marginTop: '24px', display: 'grid', gap: '12px' }}>
+                  {dateOverrides.map((override) => {
+                    const date = new Date(override.specificDate);
+                    const formattedDate = date.toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    });
+
+                    return (
+                      <div
+                        key={override.id}
+                        style={{
+                          backgroundColor: override.isAvailable ? '#f0fdf4' : '#fef2f2',
+                          border: override.isAvailable ? '1px solid #86efac' : '1px solid #fca5a5',
+                          borderRadius: '8px',
+                          padding: '16px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                            <span style={{
+                              fontSize: '16px',
+                              fontWeight: 'bold',
+                              color: '#1e293b'
+                            }}>
+                              {formattedDate}
+                            </span>
+                            <span style={{
+                              padding: '4px 12px',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              backgroundColor: override.isAvailable ? '#10b981' : '#ef4444',
+                              color: 'white'
+                            }}>
+                              {override.isAvailable ? 'Available' : 'Blocked'}
+                            </span>
+                          </div>
+                          {override.isAvailable ? (
+                            <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
+                              {override.startTime} - {override.endTime} • Max {override.maxBookings} jobs
+                            </p>
+                          ) : (
+                            <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
+                              No bookings accepted
+                            </p>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={async () => {
+                              if (!user?.id) return;
+
+                              if (window.confirm(`Delete override for ${formattedDate}?`)) {
+                                try {
+                                  // Since there's no delete endpoint, we can set isAvailable to match the recurring schedule
+                                  // Or we could add a delete endpoint to the backend
+                                  const response = await fetch(
+                                    `${API_BASE_URL}/availability/contractor/${user.id}/override`,
+                                    {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        specificDate: override.specificDate,
+                                        isAvailable: false,
+                                        startTime: '00:00',
+                                        endTime: '00:00',
+                                        maxBookings: 0
+                                      })
+                                    }
+                                  );
+
+                                  if (response.ok) {
+                                    // Refresh overrides
+                                    const today = new Date();
+                                    const sixMonthsLater = new Date();
+                                    sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+                                    const overridesResponse = await fetch(
+                                      `${API_BASE_URL}/availability/contractor/${user.id}/overrides?startDate=${today.toISOString().split('T')[0]}&endDate=${sixMonthsLater.toISOString().split('T')[0]}`
+                                    );
+                                    const overridesData = await overridesResponse.json();
+
+                                    if (overridesData.success) {
+                                      setDateOverrides(overridesData.overrides || []);
+                                    }
+
+                                    showToast('Override deleted', 'success');
+                                  }
+                                } catch (error) {
+                                  console.error('Error deleting override:', error);
+                                  showToast('Failed to delete override', 'error');
+                                }
+                              }
+                            }}
+                            style={{
+                              padding: '8px 16px',
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Custom Booking Page Section */}
         <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' }}>Custom Booking Page</h3>
         <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
           Create a branded booking page for your clients to book appointments directly
