@@ -395,14 +395,25 @@ const ContractorDashboard: React.FC = () => {
             };
           });
 
+          // Helper to validate time format (HH:mm)
+          const validateTime = (time: string, fallback: string): string => {
+            if (!time || typeof time !== 'string') return fallback;
+            const match = time.match(/^(\d{1,2}):(\d{2})$/);
+            if (!match) return fallback;
+            const hours = parseInt(match[1], 10);
+            const minutes = parseInt(match[2], 10);
+            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return fallback;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          };
+
           // Load saved schedule data (times already in 24-hour format from API)
           scheduleData.schedule.forEach((entry: any) => {
             const dayName = dayNames[entry.dayOfWeek];
 
             loadedSchedule[dayName] = {
               available: entry.isAvailable,
-              startTime: entry.startTime,
-              endTime: entry.endTime,
+              startTime: validateTime(entry.startTime, '08:00'),
+              endTime: validateTime(entry.endTime, '17:00'),
               maxJobs: entry.maxBookings,
               serviceAreas: entry.serviceAreas || []
             };
@@ -3332,368 +3343,6 @@ const ContractorDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-
-            {/* Date Override Modal */}
-            {showOverrideModal && (
-              <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000
-              }}>
-                <div style={{
-                  backgroundColor: 'white',
-                  borderRadius: '16px',
-                  padding: '32px',
-                  maxWidth: '600px',
-                  width: '90%',
-                  maxHeight: '90vh',
-                  overflow: 'auto'
-                }}>
-                  <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
-                    {editingOverrideId ? 'Edit Date Override' : 'Add Date Override'}
-                  </h3>
-
-                  <div style={{ display: 'grid', gap: '20px' }}>
-                    {/* Date Range Toggle */}
-                    <div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={overrideForm.isDateRange}
-                          onChange={(e) => setOverrideForm({ ...overrideForm, isDateRange: e.target.checked })}
-                          style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
-                          Apply to date range (multiple days)
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Date Picker - Single or Range */}
-                    {overrideForm.isDateRange ? (
-                      <div style={{ display: 'grid', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                            Start Date *
-                          </label>
-                          <input
-                            type="date"
-                            value={overrideForm.startDate}
-                            onChange={(e) => setOverrideForm({ ...overrideForm, startDate: e.target.value })}
-                            min={new Date().toISOString().split('T')[0]}
-                            style={{
-                              width: '100%',
-                              padding: '10px 12px',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '14px'
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                            End Date *
-                          </label>
-                          <input
-                            type="date"
-                            value={overrideForm.endDate}
-                            onChange={(e) => setOverrideForm({ ...overrideForm, endDate: e.target.value })}
-                            min={overrideForm.startDate || new Date().toISOString().split('T')[0]}
-                            style={{
-                              width: '100%',
-                              padding: '10px 12px',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '14px'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                          Date *
-                        </label>
-                        <input
-                          type="date"
-                          value={overrideForm.specificDate}
-                          onChange={(e) => setOverrideForm({ ...overrideForm, specificDate: e.target.value })}
-                          min={new Date().toISOString().split('T')[0]}
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            fontSize: '14px'
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Availability Toggle */}
-                    <div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={!overrideForm.isAvailable}
-                          onChange={(e) => setOverrideForm({ ...overrideForm, isAvailable: !e.target.checked })}
-                          style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
-                          Block {overrideForm.isDateRange ? 'these dates' : 'this date'} (no bookings accepted)
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Show time/jobs fields only if available */}
-                    {overrideForm.isAvailable && (
-                      <>
-                        {/* Time Range */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                            Working Hours
-                          </label>
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                            <input
-                              type="time"
-                              value={overrideForm.startTime}
-                              onChange={(e) => setOverrideForm({ ...overrideForm, startTime: e.target.value })}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px'
-                              }}
-                            />
-                            <span style={{ color: '#64748b' }}>to</span>
-                            <input
-                              type="time"
-                              value={overrideForm.endTime}
-                              onChange={(e) => setOverrideForm({ ...overrideForm, endTime: e.target.value })}
-                              style={{
-                                padding: '10px 12px',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                fontSize: '14px'
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Max Jobs */}
-                        <div>
-                          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                            Maximum Jobs
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="20"
-                            value={overrideForm.maxJobs}
-                            onChange={(e) => setOverrideForm({ ...overrideForm, maxJobs: parseInt(e.target.value) || 1 })}
-                            style={{
-                              width: '100px',
-                              padding: '10px 12px',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '8px',
-                              fontSize: '14px'
-                            }}
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {/* Reason/Note */}
-                    <div>
-                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
-                        Reason (optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Vacation, Holiday, Family event"
-                        value={overrideForm.reason}
-                        onChange={(e) => setOverrideForm({ ...overrideForm, reason: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() => setShowOverrideModal(false)}
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#f1f5f9',
-                        color: '#64748b',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!user?.id) return;
-
-                        // Validate dates
-                        if (overrideForm.isDateRange) {
-                          if (!overrideForm.startDate || !overrideForm.endDate) {
-                            showToast('Please select both start and end dates', 'error');
-                            return;
-                          }
-                          if (new Date(overrideForm.endDate) < new Date(overrideForm.startDate)) {
-                            showToast('End date must be after start date', 'error');
-                            return;
-                          }
-                        } else {
-                          if (!overrideForm.specificDate) {
-                            showToast('Please select a date', 'error');
-                            return;
-                          }
-                        }
-
-                        try {
-                          // Times are already in 24-hour format from the input
-                          const startTimeFormatted = overrideForm.isAvailable ? overrideForm.startTime : '00:00';
-                          const endTimeFormatted = overrideForm.isAvailable ? overrideForm.endTime : '00:00';
-                          const maxBookings = overrideForm.isAvailable ? overrideForm.maxJobs : 0;
-
-                          // Handle date range
-                          if (overrideForm.isDateRange) {
-                            const startDate = new Date(overrideForm.startDate);
-                            const endDate = new Date(overrideForm.endDate);
-                            const dates: string[] = [];
-
-                            // Generate all dates in range
-                            const currentDate = new Date(startDate);
-                            while (currentDate <= endDate) {
-                              dates.push(currentDate.toISOString().split('T')[0]);
-                              currentDate.setDate(currentDate.getDate() + 1);
-                            }
-
-                            // Save each date
-                            let successCount = 0;
-                            for (const date of dates) {
-                              const requestBody = {
-                                specificDate: date,
-                                isAvailable: overrideForm.isAvailable,
-                                startTime: startTimeFormatted,
-                                endTime: endTimeFormatted,
-                                maxBookings: maxBookings
-                              };
-
-                              const response = await fetch(
-                                `${API_BASE_URL}/availability/contractor/${user.id}/override`,
-                                {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify(requestBody)
-                                }
-                              );
-
-                              const result = await response.json();
-                              if (result.success) {
-                                successCount++;
-                              }
-                            }
-
-                            // Refresh overrides list
-                            const today = new Date();
-                            const sixMonthsLater = new Date();
-                            sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
-
-                            const overridesResponse = await fetch(
-                              `${API_BASE_URL}/availability/contractor/${user.id}/overrides?startDate=${today.toISOString().split('T')[0]}&endDate=${sixMonthsLater.toISOString().split('T')[0]}`
-                            );
-                            const overridesData = await overridesResponse.json();
-
-                            if (overridesData.success) {
-                              setDateOverrides(overridesData.overrides || []);
-                            }
-
-                            setShowOverrideModal(false);
-                            showToast(`Successfully created overrides for ${successCount} of ${dates.length} days`, 'success');
-                          } else {
-                            // Single date
-                            const requestBody = {
-                              specificDate: overrideForm.specificDate,
-                              isAvailable: overrideForm.isAvailable,
-                              startTime: startTimeFormatted,
-                              endTime: endTimeFormatted,
-                              maxBookings: maxBookings
-                            };
-
-                            const response = await fetch(
-                              `${API_BASE_URL}/availability/contractor/${user.id}/override`,
-                              {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(requestBody)
-                              }
-                            );
-
-                            const result = await response.json();
-
-                            if (result.success) {
-                              // Refresh overrides list
-                              const today = new Date();
-                              const sixMonthsLater = new Date();
-                              sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
-
-                              const overridesResponse = await fetch(
-                                `${API_BASE_URL}/availability/contractor/${user.id}/overrides?startDate=${today.toISOString().split('T')[0]}&endDate=${sixMonthsLater.toISOString().split('T')[0]}`
-                              );
-                              const overridesData = await overridesResponse.json();
-
-                              if (overridesData.success) {
-                                setDateOverrides(overridesData.overrides || []);
-                              }
-
-                              setShowOverrideModal(false);
-                              showToast(result.message || 'Date override saved successfully!', 'success');
-                            } else {
-                              showToast(`Failed to save: ${result.error}`, 'error');
-                            }
-                          }
-                        } catch (error) {
-                          console.error('Error saving override:', error);
-                          showToast('Failed to save date override', 'error');
-                        }
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Save Override
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -6333,10 +5982,11 @@ const ContractorDashboard: React.FC = () => {
                           {override.isAvailable ? (
                             <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
                               {override.startTime} - {override.endTime} • Max {override.maxBookings} jobs
+                              {override.reason && <span style={{ fontStyle: 'italic' }}> • {override.reason}</span>}
                             </p>
                           ) : (
                             <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                              No bookings accepted
+                              No bookings accepted{override.reason && <span style={{ fontStyle: 'italic' }}> • {override.reason}</span>}
                             </p>
                           )}
                         </div>
@@ -8889,6 +8539,370 @@ const ContractorDashboard: React.FC = () => {
         featureTriggered={premiumFeatureTriggered}
         isLoading={upgradingSubscription}
       />
+
+      {/* Date Override Modal - Global so it works from both Calendar and Settings */}
+      {showOverrideModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '24px' }}>
+              {editingOverrideId ? 'Edit Date Override' : 'Add Date Override'}
+            </h3>
+
+            <div style={{ display: 'grid', gap: '20px' }}>
+              {/* Date Range Toggle */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={overrideForm.isDateRange}
+                    onChange={(e) => setOverrideForm({ ...overrideForm, isDateRange: e.target.checked })}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                    Apply to date range (multiple days)
+                  </span>
+                </label>
+              </div>
+
+              {/* Date Picker - Single or Range */}
+              {overrideForm.isDateRange ? (
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                      Start Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={overrideForm.startDate}
+                      onChange={(e) => setOverrideForm({ ...overrideForm, startDate: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                      End Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={overrideForm.endDate}
+                      onChange={(e) => setOverrideForm({ ...overrideForm, endDate: e.target.value })}
+                      min={overrideForm.startDate || new Date().toISOString().split('T')[0]}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={overrideForm.specificDate}
+                    onChange={(e) => setOverrideForm({ ...overrideForm, specificDate: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Availability Toggle */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!overrideForm.isAvailable}
+                    onChange={(e) => setOverrideForm({ ...overrideForm, isAvailable: !e.target.checked })}
+                    style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>
+                    Block {overrideForm.isDateRange ? 'these dates' : 'this date'} (no bookings accepted)
+                  </span>
+                </label>
+              </div>
+
+              {/* Show time/jobs fields only if available */}
+              {overrideForm.isAvailable && (
+                <>
+                  {/* Time Range */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                      Working Hours
+                    </label>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <input
+                        type="time"
+                        value={overrideForm.startTime}
+                        onChange={(e) => setOverrideForm({ ...overrideForm, startTime: e.target.value })}
+                        style={{
+                          padding: '10px 12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                      <span style={{ color: '#64748b' }}>to</span>
+                      <input
+                        type="time"
+                        value={overrideForm.endTime}
+                        onChange={(e) => setOverrideForm({ ...overrideForm, endTime: e.target.value })}
+                        style={{
+                          padding: '10px 12px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Max Jobs */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                      Maximum Jobs
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={overrideForm.maxJobs}
+                      onChange={(e) => setOverrideForm({ ...overrideForm, maxJobs: parseInt(e.target.value) || 1 })}
+                      style={{
+                        width: '100px',
+                        padding: '10px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Reason/Note */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                  Reason (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Vacation, Holiday, Family event"
+                  value={overrideForm.reason}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, reason: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowOverrideModal(false)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#64748b',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!user?.id) return;
+
+                  // Validate dates
+                  if (overrideForm.isDateRange) {
+                    if (!overrideForm.startDate || !overrideForm.endDate) {
+                      showToast('Please select both start and end dates', 'error');
+                      return;
+                    }
+                    if (new Date(overrideForm.endDate) < new Date(overrideForm.startDate)) {
+                      showToast('End date must be after start date', 'error');
+                      return;
+                    }
+                  } else {
+                    if (!overrideForm.specificDate) {
+                      showToast('Please select a date', 'error');
+                      return;
+                    }
+                  }
+
+                  try {
+                    // Times are already in 24-hour format from the input
+                    const startTimeFormatted = overrideForm.isAvailable ? overrideForm.startTime : '00:00';
+                    const endTimeFormatted = overrideForm.isAvailable ? overrideForm.endTime : '00:00';
+                    const maxBookings = overrideForm.isAvailable ? overrideForm.maxJobs : 0;
+
+                    // Handle date range
+                    if (overrideForm.isDateRange) {
+                      const startDate = new Date(overrideForm.startDate);
+                      const endDate = new Date(overrideForm.endDate);
+                      const dates: string[] = [];
+
+                      // Generate all dates in range
+                      const currentDate = new Date(startDate);
+                      while (currentDate <= endDate) {
+                        dates.push(currentDate.toISOString().split('T')[0]);
+                        currentDate.setDate(currentDate.getDate() + 1);
+                      }
+
+                      // Save each date
+                      let successCount = 0;
+                      for (const date of dates) {
+                        const requestBody = {
+                          specificDate: date,
+                          isAvailable: overrideForm.isAvailable,
+                          startTime: startTimeFormatted,
+                          endTime: endTimeFormatted,
+                          maxBookings: maxBookings,
+                          reason: overrideForm.reason || undefined
+                        };
+
+                        const response = await fetch(
+                          `${API_BASE_URL}/availability/contractor/${user.id}/override`,
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody)
+                          }
+                        );
+
+                        const result = await response.json();
+                        if (result.success) {
+                          successCount++;
+                        }
+                      }
+
+                      // Refresh overrides list
+                      const today = new Date();
+                      const sixMonthsLater = new Date();
+                      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+                      const overridesResponse = await fetch(
+                        `${API_BASE_URL}/availability/contractor/${user.id}/overrides?startDate=${today.toISOString().split('T')[0]}&endDate=${sixMonthsLater.toISOString().split('T')[0]}`
+                      );
+                      const overridesData = await overridesResponse.json();
+
+                      if (overridesData.success) {
+                        setDateOverrides(overridesData.overrides || []);
+                      }
+
+                      setShowOverrideModal(false);
+                      showToast(`Successfully created overrides for ${successCount} of ${dates.length} days`, 'success');
+                    } else {
+                      // Single date
+                      const requestBody = {
+                        specificDate: overrideForm.specificDate,
+                        isAvailable: overrideForm.isAvailable,
+                        startTime: startTimeFormatted,
+                        endTime: endTimeFormatted,
+                        maxBookings: maxBookings,
+                        reason: overrideForm.reason || undefined
+                      };
+
+                      const response = await fetch(
+                        `${API_BASE_URL}/availability/contractor/${user.id}/override`,
+                        {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(requestBody)
+                        }
+                      );
+
+                      const result = await response.json();
+
+                      if (result.success) {
+                        // Refresh overrides list
+                        const today = new Date();
+                        const sixMonthsLater = new Date();
+                        sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+                        const overridesResponse = await fetch(
+                          `${API_BASE_URL}/availability/contractor/${user.id}/overrides?startDate=${today.toISOString().split('T')[0]}&endDate=${sixMonthsLater.toISOString().split('T')[0]}`
+                        );
+                        const overridesData = await overridesResponse.json();
+
+                        if (overridesData.success) {
+                          setDateOverrides(overridesData.overrides || []);
+                        }
+
+                        setShowOverrideModal(false);
+                        showToast(result.message || 'Date override saved successfully!', 'success');
+                      } else {
+                        showToast(`Failed to save: ${result.error}`, 'error');
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error saving override:', error);
+                    showToast('Failed to save date override', 'error');
+                  }
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Save Override
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Report Client Modal */}
       {showReportClientModal && reportClientJob && (

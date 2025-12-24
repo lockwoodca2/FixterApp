@@ -591,6 +591,7 @@ model Availability {
   maxBookings     Int       @default(8) @map("max_bookings") // Max jobs per day
   isAvailable     Boolean   @default(true) @map("is_available")
   isRecurring     Boolean   @default(true) @map("is_recurring") // true = recurring weekly, false = specific date
+  reason          String?   // Optional reason for override (e.g., "Vacation", "Holiday")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

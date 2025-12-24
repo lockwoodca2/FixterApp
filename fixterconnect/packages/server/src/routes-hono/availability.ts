@@ -287,7 +287,7 @@ availability.post('/availability/contractor/:contractorId/override', async (c) =
   try {
     const prisma = c.get('prisma');
     const { contractorId } = c.req.param();
-    const { specificDate, startTime, endTime, maxBookings, isAvailable } = await c.req.json();
+    const { specificDate, startTime, endTime, maxBookings, isAvailable, reason } = await c.req.json();
 
     if (!specificDate) {
       return c.json({
@@ -316,7 +316,8 @@ availability.post('/availability/contractor/:contractorId/override', async (c) =
           startTime: startTime || existing.startTime,
           endTime: endTime || existing.endTime,
           maxBookings: maxBookings || existing.maxBookings,
-          isAvailable: isAvailable !== undefined ? isAvailable : existing.isAvailable
+          isAvailable: isAvailable !== undefined ? isAvailable : existing.isAvailable,
+          reason: reason !== undefined ? reason : existing.reason
         }
       });
 
@@ -336,7 +337,8 @@ availability.post('/availability/contractor/:contractorId/override', async (c) =
         endTime: endTime || '17:00',
         maxBookings: maxBookings || 8,
         isAvailable: isAvailable !== false,
-        isRecurring: false
+        isRecurring: false,
+        reason: reason || null
       }
     });
 

@@ -12,7 +12,8 @@
       "Bash(npm install:*)",
       "Bash(cat:*)",
       "Bash(pkill:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []
