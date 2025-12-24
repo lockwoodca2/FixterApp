@@ -5997,24 +5997,14 @@ const ContractorDashboard: React.FC = () => {
 
                               if (window.confirm(`Delete override for ${formattedDate}?`)) {
                                 try {
-                                  // Since there's no delete endpoint, we can set isAvailable to match the recurring schedule
-                                  // Or we could add a delete endpoint to the backend
                                   const response = await fetch(
-                                    `${API_BASE_URL}/availability/contractor/${user.id}/override`,
-                                    {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        specificDate: override.specificDate,
-                                        isAvailable: false,
-                                        startTime: '00:00',
-                                        endTime: '00:00',
-                                        maxBookings: 0
-                                      })
-                                    }
+                                    `${API_BASE_URL}/availability/contractor/${user.id}/override/${override.id}`,
+                                    { method: 'DELETE' }
                                   );
 
-                                  if (response.ok) {
+                                  const result = await response.json();
+
+                                  if (result.success) {
                                     // Refresh overrides
                                     const today = new Date();
                                     const sixMonthsLater = new Date();
@@ -6030,6 +6020,8 @@ const ContractorDashboard: React.FC = () => {
                                     }
 
                                     showToast('Override deleted', 'success');
+                                  } else {
+                                    showToast(result.error || 'Failed to delete override', 'error');
                                   }
                                 } catch (error) {
                                   console.error('Error deleting override:', error);

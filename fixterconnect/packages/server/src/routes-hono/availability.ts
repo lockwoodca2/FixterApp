@@ -356,6 +356,46 @@ availability.post('/availability/contractor/:contractorId/override', async (c) =
   }
 });
 
+// DELETE /api/availability/contractor/:contractorId/override/:overrideId - Delete specific date override
+availability.delete('/availability/contractor/:contractorId/override/:overrideId', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { contractorId, overrideId } = c.req.param();
+
+    // Verify the override exists and belongs to this contractor
+    const existing = await prisma.availability.findFirst({
+      where: {
+        id: parseInt(overrideId),
+        contractorId: parseInt(contractorId),
+        isRecurring: false
+      }
+    });
+
+    if (!existing) {
+      return c.json({
+        success: false,
+        error: 'Override not found'
+      }, 404);
+    }
+
+    // Delete the override
+    await prisma.availability.delete({
+      where: { id: parseInt(overrideId) }
+    });
+
+    return c.json({
+      success: true,
+      message: 'Override deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete date override error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to delete date override'
+    }, 500);
+  }
+});
+
 // GET /api/availability/contractor/:contractorId/overrides - Get date overrides for a date range
 availability.get('/availability/contractor/:contractorId/overrides', async (c) => {
   try {
