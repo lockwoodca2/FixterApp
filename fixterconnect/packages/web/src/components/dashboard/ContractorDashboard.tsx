@@ -5210,6 +5210,9 @@ const ContractorDashboard: React.FC = () => {
       ? contractorServices.filter(id => id !== serviceId)
       : [...contractorServices, serviceId];
 
+    // Optimistic update - update UI immediately
+    setContractorServices(newServices);
+
     try {
       const response = await fetch(`${API_BASE_URL}/contractor/services`, {
         method: 'POST',
@@ -5221,11 +5224,14 @@ const ContractorDashboard: React.FC = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setContractorServices(newServices);
+      if (!data.success) {
+        // Revert on failure
+        setContractorServices(contractorServices);
       }
     } catch (error) {
       console.error('Error updating services:', error);
+      // Revert on error
+      setContractorServices(contractorServices);
     }
   };
 
@@ -5236,6 +5242,9 @@ const ContractorDashboard: React.FC = () => {
     const updatedAreas = isSelected
       ? contractorAreas.filter(area => area !== areaName)
       : [...contractorAreas, areaName];
+
+    // Optimistic update - update UI immediately
+    setContractorAreas(updatedAreas);
 
     try {
       const response = await fetch(`${API_BASE_URL}/contractor/areas`, {
@@ -5248,11 +5257,14 @@ const ContractorDashboard: React.FC = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setContractorAreas(updatedAreas);
+      if (!data.success) {
+        // Revert on failure
+        setContractorAreas(contractorAreas);
       }
     } catch (error) {
       console.error('Error updating service areas:', error);
+      // Revert on error
+      setContractorAreas(contractorAreas);
     }
   };
 
