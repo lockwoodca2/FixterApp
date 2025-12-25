@@ -339,12 +339,9 @@ const ContractorDashboard: React.FC = () => {
   const fetchServicesForAddJob = useCallback(async () => {
     if (allServices.length > 0) return; // Already loaded
     try {
-      console.log('Fetching services from:', `${API_BASE_URL}/services`);
       const servicesResponse = await fetch(`${API_BASE_URL}/services`);
       const servicesData = await servicesResponse.json();
-      console.log('Services response:', servicesData);
       if (servicesData.success && servicesData.services) {
-        console.log('Setting services:', servicesData.services.length);
         setAllServices(servicesData.services);
       }
     } catch (error) {
@@ -8285,7 +8282,7 @@ const ContractorDashboard: React.FC = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="">Select a service... ({allServices.length} available)</option>
+                  <option value="">Select a service...</option>
                   {allServices.map((service: any) => (
                     <option key={service.id} value={service.name}>
                       {service.name}
@@ -8636,7 +8633,7 @@ const ContractorDashboard: React.FC = () => {
                 Cancel
               </button>
               <button
-                onClick={handleAddJob}
+                onClick={() => handleAddJob(false)}
                 disabled={uploadingPhotos}
                 style={{
                   padding: '12px 24px',
