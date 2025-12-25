@@ -6162,7 +6162,10 @@ const ContractorDashboard: React.FC = () => {
               {dateOverrides.length > 0 && (
                 <div style={{ marginTop: '24px', display: 'grid', gap: '12px' }}>
                   {dateOverrides.map((override) => {
-                    const date = new Date(override.specificDate);
+                    // Parse date as local to avoid timezone shift
+                    // specificDate comes as "YYYY-MM-DD" string
+                    const [year, month, day] = override.specificDate.split('-').map(Number);
+                    const date = new Date(year, month - 1, day); // month is 0-indexed
                     const formattedDate = date.toLocaleDateString('en-US', {
                       weekday: 'short',
                       month: 'short',
