@@ -54,8 +54,12 @@ availability.get('/availability/contractor/:contractorId/range', async (c) => {
       }, 400);
     }
 
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
+    // Parse date strings as UTC to avoid timezone shifts
+    const [sYear, sMonth, sDay] = (startDate as string).split('-').map(Number);
+    const start = new Date(Date.UTC(sYear, sMonth - 1, sDay, 12, 0, 0));
+
+    const [eYear, eMonth, eDay] = (endDate as string).split('-').map(Number);
+    const end = new Date(Date.UTC(eYear, eMonth - 1, eDay, 12, 0, 0));
 
     const availabilities = await getContractorAvailabilityRange(
       prisma,
@@ -85,7 +89,14 @@ availability.get('/availability/contractor/:contractorId/next', async (c) => {
     const { contractorId } = c.req.param();
     const { startDate, maxDays } = c.req.query();
 
-    const start = startDate ? new Date(startDate as string) : new Date();
+    // Parse date string as UTC to avoid timezone shifts
+    let start: Date;
+    if (startDate) {
+      const [sYear, sMonth, sDay] = (startDate as string).split('-').map(Number);
+      start = new Date(Date.UTC(sYear, sMonth - 1, sDay, 12, 0, 0));
+    } else {
+      start = new Date();
+    }
     const maxDaysAhead = maxDays ? parseInt(maxDays as string) : 30;
 
     const nextAvailable = await getNextAvailableDate(
@@ -296,8 +307,10 @@ availability.post('/availability/contractor/:contractorId/override', async (c) =
       }, 400);
     }
 
-    const targetDate = new Date(specificDate);
-    targetDate.setHours(0, 0, 0, 0);
+    // Parse date string as UTC to avoid timezone shifts
+    // specificDate comes as "YYYY-MM-DD" string
+    const [year, month, day] = specificDate.split('-').map(Number);
+    const targetDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)); // Use noon UTC to avoid any edge cases
 
     // Check if override already exists
     const existing = await prisma.availability.findFirst({
@@ -410,11 +423,12 @@ availability.get('/availability/contractor/:contractorId/overrides', async (c) =
       }, 400);
     }
 
-    const start = new Date(startDate as string);
-    start.setHours(0, 0, 0, 0);
+    // Parse date strings as UTC to avoid timezone shifts
+    const [sYear, sMonth, sDay] = (startDate as string).split('-').map(Number);
+    const start = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0));
 
-    const end = new Date(endDate as string);
-    end.setHours(23, 59, 59, 999);
+    const [eYear, eMonth, eDay] = (endDate as string).split('-').map(Number);
+    const end = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59));
 
     const overrides = await prisma.availability.findMany({
       where: {

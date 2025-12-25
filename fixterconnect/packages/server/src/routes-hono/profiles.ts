@@ -328,8 +328,14 @@ profiles.get('/contractor/:id/availability', async (c) => {
 
     if (startDate || endDate) {
       where.specificDate = {};
-      if (startDate) where.specificDate.gte = new Date(startDate);
-      if (endDate) where.specificDate.lte = new Date(endDate);
+      if (startDate) {
+        const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+        where.specificDate.gte = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0));
+      }
+      if (endDate) {
+        const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+        where.specificDate.lte = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59));
+      }
     }
 
     const availability = await prisma.availability.findMany({
@@ -366,10 +372,17 @@ profiles.post('/contractor/:id/availability', async (c) => {
       }, 400);
     }
 
+    // Parse date string as UTC to avoid timezone shifts
+    let parsedDate = null;
+    if (date) {
+      const [year, month, day] = date.split('-').map(Number);
+      parsedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    }
+
     const availability = await prisma.availability.create({
       data: {
         contractorId: parseInt(id),
-        specificDate: date ? new Date(date) : null,
+        specificDate: parsedDate,
         dayOfWeek: dayOfWeek !== undefined ? dayOfWeek : null,
         isRecurring: isRecurring !== undefined ? isRecurring : !date,
         startTime,
