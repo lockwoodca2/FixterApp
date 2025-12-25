@@ -8285,7 +8285,7 @@ const ContractorDashboard: React.FC = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="">Select a service...</option>
+                  <option value="">Select a service... ({allServices.length} available)</option>
                   {allServices.map((service: any) => (
                     <option key={service.id} value={service.name}>
                       {service.name}
