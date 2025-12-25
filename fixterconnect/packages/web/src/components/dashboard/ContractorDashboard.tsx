@@ -122,6 +122,8 @@ const ContractorDashboard: React.FC = () => {
 
   // Add Job modal states
   const [showAddJobModal, setShowAddJobModal] = useState(false);
+  const [addJobWarnings, setAddJobWarnings] = useState<string[]>([]);
+  const [showAddJobWarningModal, setShowAddJobWarningModal] = useState(false);
   const [addJobForm, setAddJobForm] = useState<any>({
     clientName: '',
     clientEmail: '',
@@ -1206,12 +1208,123 @@ const ContractorDashboard: React.FC = () => {
     setSpeechRecognition(recognition);
   };
 
-  const handleAddJob = async () => {
+  // Validate add job form for conflicts and warnings
+  const validateAddJobForm = (): string[] => {
+    const warnings: string[] = [];
+    const scheduledDate = addJobForm.scheduledDate;
+    const scheduledTime = addJobForm.scheduledTime;
+    const address = addJobForm.address?.toLowerCase() || '';
+    const duration = parseInt(addJobForm.duration) || 90;
+
+    if (!scheduledDate || !scheduledTime) return warnings;
+
+    // Parse the scheduled date
+    const jobDate = new Date(scheduledDate + 'T00:00:00');
+    const dayOfWeek = jobDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[dayOfWeek];
+
+    // 1. Check if date is blocked by an override
+    const dateStr = scheduledDate; // Already in YYYY-MM-DD format
+    const dateOverride = dateOverrides.find(override => {
+      const overrideDate = override.specificDate.split('T')[0];
+      return overrideDate === dateStr;
+    });
+
+    if (dateOverride && !dateOverride.isAvailable) {
+      warnings.push(`⚠️ This date (${new Date(scheduledDate).toLocaleDateString()}) is marked as BLOCKED in your availability settings.`);
+    }
+
+    // 2. Check recurring schedule - is this day normally available?
+    const daySchedule = weeklySchedule[dayName];
+    if (daySchedule && !daySchedule.available && !dateOverride?.isAvailable) {
+      warnings.push(`⚠️ You are normally unavailable on ${dayName.charAt(0).toUpperCase() + dayName.slice(1)}s according to your recurring schedule.`);
+    }
+
+    // 3. Check if time is within working hours
+    if (daySchedule?.available || dateOverride?.isAvailable) {
+      const workStart = dateOverride?.isAvailable ? dateOverride.startTime : daySchedule?.startTime;
+      const workEnd = dateOverride?.isAvailable ? dateOverride.endTime : daySchedule?.endTime;
+
+      if (workStart && workEnd) {
+        const [jobHour, jobMin] = scheduledTime.split(':').map(Number);
+        const [startHour, startMin] = workStart.split(':').map(Number);
+        const [endHour, endMin] = workEnd.split(':').map(Number);
+
+        const jobMinutes = jobHour * 60 + jobMin;
+        const startMinutes = startHour * 60 + startMin;
+        const endMinutes = endHour * 60 + endMin;
+        const jobEndMinutes = jobMinutes + duration;
+
+        if (jobMinutes < startMinutes || jobEndMinutes > endMinutes) {
+          warnings.push(`⚠️ This job time (${scheduledTime}) is outside your working hours (${workStart} - ${workEnd}).`);
+        }
+      }
+    }
+
+    // 4. Check for conflicting bookings (double booking)
+    const existingBookingsOnDate = monthlyBookings.filter(booking => {
+      const bookingDate = booking.scheduledDate.split('T')[0];
+      return bookingDate === dateStr && booking.status !== 'cancelled';
+    });
+
+    if (existingBookingsOnDate.length > 0) {
+      // Parse job time
+      const [jobHour, jobMin] = scheduledTime.split(':').map(Number);
+      const jobStartMinutes = jobHour * 60 + jobMin;
+      const jobEndMinutes = jobStartMinutes + duration;
+
+      for (const booking of existingBookingsOnDate) {
+        // Parse existing booking time
+        const bookingTime = booking.scheduledTime?.split(' - ')[0] || '';
+        if (bookingTime) {
+          const [bHour, bMin] = bookingTime.split(':').map(Number);
+          const bookingStartMinutes = bHour * 60 + bMin;
+          const bookingDuration = booking.estimatedDuration || 90;
+          const bookingEndMinutes = bookingStartMinutes + bookingDuration;
+
+          // Check for overlap
+          if (jobStartMinutes < bookingEndMinutes && jobEndMinutes > bookingStartMinutes) {
+            warnings.push(`⚠️ Time conflict: You already have a job scheduled at ${bookingTime} (${booking.service?.name || 'Job'} for ${booking.client?.firstName || 'Client'}).`);
+          }
+        }
+      }
+    }
+
+    // 5. Check if address is in service area
+    const matchedArea = contractorAreas.find(area => address.includes(area.toLowerCase()));
+    if (!matchedArea && contractorAreas.length > 0 && address.length > 5) {
+      warnings.push(`⚠️ The job address doesn't appear to be in your service areas (${contractorAreas.join(', ')}).`);
+    }
+
+    // 6. Check day-specific service areas from recurring schedule
+    if (daySchedule?.available && daySchedule.serviceAreas?.length > 0 && !dateOverride) {
+      const dayServiceAreas = daySchedule.serviceAreas.map((a: string) => a.toLowerCase());
+      const inDayArea = dayServiceAreas.some((area: string) => address.includes(area));
+      if (!inDayArea && address.length > 5) {
+        warnings.push(`⚠️ On ${dayName.charAt(0).toUpperCase() + dayName.slice(1)}s, you only service: ${daySchedule.serviceAreas.join(', ')}. This address may be outside that area.`);
+      }
+    }
+
+    return warnings;
+  };
+
+  const handleAddJob = async (bypassWarnings = false) => {
     try {
       // Validate required fields
       if (!addJobForm.clientName || !addJobForm.service || !addJobForm.address || !addJobForm.scheduledDate || !addJobForm.scheduledTime) {
         showToast('Please fill in all required fields', 'error');
         return;
+      }
+
+      // Check for warnings if not bypassing
+      if (!bypassWarnings) {
+        const warnings = validateAddJobForm();
+        if (warnings.length > 0) {
+          setAddJobWarnings(warnings);
+          setShowAddJobWarningModal(true);
+          return;
+        }
       }
 
       setUploadingPhotos(true);
@@ -8514,6 +8627,113 @@ const ContractorDashboard: React.FC = () => {
                 }}
               >
                 {uploadingPhotos ? 'Adding Job...' : 'Add Job'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Job Warning Modal */}
+      {showAddJobWarningModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1001
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '90%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                backgroundColor: '#fef3c7',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px'
+              }}>
+                ⚠️
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
+                Scheduling Conflicts Detected
+              </h3>
+            </div>
+
+            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+              The following issues were found with this job. You can still add it, but please review:
+            </p>
+
+            <div style={{
+              backgroundColor: '#fffbeb',
+              border: '1px solid #fbbf24',
+              borderRadius: '8px',
+              padding: '16px',
+              marginBottom: '24px'
+            }}>
+              {addJobWarnings.map((warning, index) => (
+                <p key={index} style={{
+                  fontSize: '14px',
+                  color: '#92400e',
+                  margin: index === addJobWarnings.length - 1 ? 0 : '0 0 12px 0',
+                  lineHeight: '1.5'
+                }}>
+                  {warning}
+                </p>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowAddJobWarningModal(false);
+                  setAddJobWarnings([]);
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#64748b',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddJobWarningModal(false);
+                  setAddJobWarnings([]);
+                  handleAddJob(true); // Bypass warnings
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Add Anyway
               </button>
             </div>
           </div>
