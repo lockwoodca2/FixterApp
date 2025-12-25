@@ -400,6 +400,12 @@ const ContractorDashboard: React.FC = () => {
       if (todayJobsData.success) {
         // Filter out cancelled bookings on the frontend as well (safety check)
         const activeJobs = todayJobsData.bookings.filter((job: any) => job.status !== 'CANCELLED');
+        // Sort by scheduled time (earliest first)
+        activeJobs.sort((a: any, b: any) => {
+          const timeA = a.scheduledTime?.split(' - ')[0] || a.scheduledTime || '99:99';
+          const timeB = b.scheduledTime?.split(' - ')[0] || b.scheduledTime || '99:99';
+          return timeA.localeCompare(timeB);
+        });
         setTodaysJobs(activeJobs);
       }
 
