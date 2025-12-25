@@ -335,6 +335,26 @@ const ContractorDashboard: React.FC = () => {
     }, 3000);
   }, []);
 
+  // Fetch services for Add Job modal
+  const fetchServicesForAddJob = async () => {
+    if (allServices.length > 0) return; // Already loaded
+    try {
+      const servicesResponse = await fetch(`${API_BASE_URL}/services`);
+      const servicesData = await servicesResponse.json();
+      if (servicesData.success) {
+        setAllServices(servicesData.services);
+      }
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    }
+  };
+
+  // Open Add Job modal and ensure services are loaded
+  const openAddJobModal = () => {
+    fetchServicesForAddJob();
+    setShowAddJobModal(true);
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchContractorData();
@@ -1964,7 +1984,7 @@ const ContractorDashboard: React.FC = () => {
             REFRESH
           </button>
           <button
-            onClick={() => setShowAddJobModal(true)}
+            onClick={openAddJobModal}
             style={{
               padding: '10px 20px',
               backgroundColor: '#10b981',
