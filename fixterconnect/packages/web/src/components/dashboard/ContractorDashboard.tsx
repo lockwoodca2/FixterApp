@@ -127,6 +127,7 @@ const ContractorDashboard: React.FC = () => {
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [addJobWarnings, setAddJobWarnings] = useState<string[]>([]);
   const [showAddJobWarningModal, setShowAddJobWarningModal] = useState(false);
+  const [addJobDateBookings, setAddJobDateBookings] = useState<any[]>([]); // Bookings for the selected date in Add Job
   const [addJobForm, setAddJobForm] = useState<any>({
     clientName: '',
     clientEmail: '',
@@ -355,8 +356,28 @@ const ContractorDashboard: React.FC = () => {
   // Open Add Job modal and ensure services are loaded
   const openAddJobModal = async () => {
     setShowAddJobModal(true);
+    setAddJobDateBookings([]); // Reset bookings for new modal
     await fetchServicesForAddJob();
   };
+
+  // Fetch bookings for the selected date in Add Job modal (for conflict detection)
+  useEffect(() => {
+    const fetchBookingsForDate = async () => {
+      if (!user?.id || !showAddJobModal || !addJobForm.scheduledDate) return;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/bookings/contractor/${user.id}?date=${addJobForm.scheduledDate}`);
+        const data = await response.json();
+        if (data.success) {
+          setAddJobDateBookings(data.bookings || []);
+        }
+      } catch (error) {
+        console.error('Error fetching bookings for date:', error);
+      }
+    };
+
+    fetchBookingsForDate();
+  }, [user?.id, showAddJobModal, addJobForm.scheduledDate]);
 
   useEffect(() => {
     if (user?.id) {
@@ -1335,9 +1356,22 @@ const ContractorDashboard: React.FC = () => {
     }
 
     // 4. Check for conflicting bookings (double booking)
-    const existingBookingsOnDate = monthlyBookings.filter(booking => {
+    // Combine monthlyBookings, todaysJobs, and addJobDateBookings, removing duplicates by id
+    const allBookings = [...monthlyBookings];
+    todaysJobs.forEach(job => {
+      if (!allBookings.find(b => b.id === job.id)) {
+        allBookings.push(job);
+      }
+    });
+    addJobDateBookings.forEach(job => {
+      if (!allBookings.find(b => b.id === job.id)) {
+        allBookings.push(job);
+      }
+    });
+
+    const existingBookingsOnDate = allBookings.filter(booking => {
       const bookingDate = booking.scheduledDate.split('T')[0];
-      return bookingDate === dateStr && booking.status !== 'cancelled';
+      return bookingDate === dateStr && booking.status !== 'cancelled' && booking.status !== 'CANCELLED';
     });
 
     if (existingBookingsOnDate.length > 0) {
@@ -1347,17 +1381,27 @@ const ContractorDashboard: React.FC = () => {
       const jobEndMinutes = jobStartMinutes + duration;
 
       for (const booking of existingBookingsOnDate) {
-        // Parse existing booking time
-        const bookingTime = booking.scheduledTime?.split(' - ')[0] || '';
-        if (bookingTime) {
-          const [bHour, bMin] = bookingTime.split(':').map(Number);
-          const bookingStartMinutes = bHour * 60 + bMin;
-          const bookingDuration = booking.estimatedDuration || 90;
-          const bookingEndMinutes = bookingStartMinutes + bookingDuration;
+        // Parse existing booking time - handle both "HH:MM - HH:MM" format and standalone "HH:MM"
+        let bookingTime = '';
+        if (booking.scheduledTime) {
+          bookingTime = booking.scheduledTime.includes(' - ')
+            ? booking.scheduledTime.split(' - ')[0]
+            : booking.scheduledTime;
+        }
 
-          // Check for overlap
-          if (jobStartMinutes < bookingEndMinutes && jobEndMinutes > bookingStartMinutes) {
-            warnings.push(`⚠️ Time conflict: You already have a job scheduled at ${bookingTime} (${booking.service?.name || 'Job'} for ${booking.client?.firstName || 'Client'}).`);
+        if (bookingTime && bookingTime.includes(':')) {
+          const [bHour, bMin] = bookingTime.split(':').map(Number);
+          if (!isNaN(bHour) && !isNaN(bMin)) {
+            const bookingStartMinutes = bHour * 60 + bMin;
+            const bookingDuration = booking.estimatedDuration || 90;
+            const bookingEndMinutes = bookingStartMinutes + bookingDuration;
+
+            // Check for overlap
+            if (jobStartMinutes < bookingEndMinutes && jobEndMinutes > bookingStartMinutes) {
+              const clientName = booking.client?.firstName || booking.clientName || 'Client';
+              const serviceName = booking.service?.name || booking.serviceName || 'Job';
+              warnings.push(`⚠️ Time conflict: You already have "${serviceName}" scheduled at ${bookingTime} for ${clientName}.`);
+            }
           }
         }
       }
