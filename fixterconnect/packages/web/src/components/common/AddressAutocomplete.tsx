@@ -170,6 +170,25 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     }
   };
 
+  // Ensure input stays enabled - Google Autocomplete can sometimes disable it
+  const handleFocus = () => {
+    if (inputRef.current) {
+      inputRef.current.disabled = false;
+      inputRef.current.readOnly = false;
+    }
+  };
+
+  // Re-enable on blur as well
+  const handleBlur = () => {
+    // Small delay to let Google's event handlers finish
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.disabled = false;
+        inputRef.current.readOnly = false;
+      }
+    }, 100);
+  };
+
   return (
     <input
       ref={inputRef}
@@ -177,8 +196,13 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onClick={handleFocus}
       placeholder={placeholder}
       autoFocus={autoFocus}
+      disabled={false}
+      readOnly={false}
       style={{
         width: '100%',
         padding: '12px',
@@ -186,6 +210,8 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         borderRadius: '8px',
         fontSize: '14px',
         outline: 'none',
+        backgroundColor: 'white',
+        cursor: 'text',
         ...style
       }}
     />
