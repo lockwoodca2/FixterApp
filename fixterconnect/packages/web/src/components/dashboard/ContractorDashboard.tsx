@@ -336,23 +336,26 @@ const ContractorDashboard: React.FC = () => {
   }, []);
 
   // Fetch services for Add Job modal
-  const fetchServicesForAddJob = async () => {
+  const fetchServicesForAddJob = useCallback(async () => {
     if (allServices.length > 0) return; // Already loaded
     try {
+      console.log('Fetching services from:', `${API_BASE_URL}/services`);
       const servicesResponse = await fetch(`${API_BASE_URL}/services`);
       const servicesData = await servicesResponse.json();
-      if (servicesData.success) {
+      console.log('Services response:', servicesData);
+      if (servicesData.success && servicesData.services) {
+        console.log('Setting services:', servicesData.services.length);
         setAllServices(servicesData.services);
       }
     } catch (error) {
       console.error('Error fetching services:', error);
     }
-  };
+  }, [allServices.length]);
 
   // Open Add Job modal and ensure services are loaded
-  const openAddJobModal = () => {
-    fetchServicesForAddJob();
+  const openAddJobModal = async () => {
     setShowAddJobModal(true);
+    await fetchServicesForAddJob();
   };
 
   useEffect(() => {
