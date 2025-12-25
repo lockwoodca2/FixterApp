@@ -28,6 +28,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import PremiumUpgradeModal from '../common/PremiumUpgradeModal';
+import AddressAutocomplete from '../common/AddressAutocomplete';
 
 type ActiveSection = 'today' | 'messages' | 'invoices' | 'history' | 'calendar' | 'quotes' | 'earnings' | 'settings';
 
@@ -91,6 +92,8 @@ const ContractorDashboard: React.FC = () => {
   const [timeSlotConflicts, setTimeSlotConflicts] = useState<any[]>([]);
   const [nextAvailableTime, setNextAvailableTime] = useState<string | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [editingAddressJobId, setEditingAddressJobId] = useState<number | null>(null);
+  const [editingAddressValue, setEditingAddressValue] = useState('');
 
   // Schedule changes modal
   const [showScheduleChanges, setShowScheduleChanges] = useState(false);
@@ -900,6 +903,55 @@ const ContractorDashboard: React.FC = () => {
     setShowScheduleChanges(false);
     setPendingReorder(null);
     setAffectedAppointments([]);
+  };
+
+  // Edit address handler
+  const handleEditAddress = (job: any) => {
+    setEditingAddressJobId(job.id);
+    setEditingAddressValue(job.serviceAddress || '');
+  };
+
+  const handleSaveAddress = async (jobId: number) => {
+    if (!editingAddressValue.trim()) {
+      showToast('Address cannot be empty', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/${jobId}/address`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceAddress: editingAddressValue.trim() })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Update local state
+        setTodaysJobs(todaysJobs.map(job =>
+          job.id === jobId ? { ...job, serviceAddress: editingAddressValue.trim() } : job
+        ));
+        setMonthlyBookings(monthlyBookings.map(job =>
+          job.id === jobId ? { ...job, serviceAddress: editingAddressValue.trim() } : job
+        ));
+        setSelectedDateJobs(selectedDateJobs.map(job =>
+          job.id === jobId ? { ...job, serviceAddress: editingAddressValue.trim() } : job
+        ));
+        showToast('Address updated successfully', 'success');
+      } else {
+        showToast(data.error || 'Failed to update address', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating address:', error);
+      showToast('Failed to update address', 'error');
+    }
+
+    setEditingAddressJobId(null);
+    setEditingAddressValue('');
+  };
+
+  const handleCancelAddressEdit = () => {
+    setEditingAddressJobId(null);
+    setEditingAddressValue('');
   };
 
   // Edit handlers
@@ -2285,12 +2337,51 @@ const ContractorDashboard: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#64748b', fontSize: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <MapPin size={16} />
-                      <a href={`https://maps.google.com/?q=${encodeURIComponent(job.serviceAddress)}`}
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         style={{ color: '#4f46e5', textDecoration: 'none' }}>
-                        {job.serviceAddress}
-                      </a>
+                      {editingAddressJobId === job.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                          <AddressAutocomplete
+                            value={editingAddressValue}
+                            onChange={(value) => setEditingAddressValue(value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveAddress(job.id);
+                              if (e.key === 'Escape') handleCancelAddressEdit();
+                            }}
+                            autoFocus
+                            placeholder="Enter address..."
+                            style={{
+                              flex: 1,
+                              padding: '4px 8px',
+                              border: '1px solid #4f46e5',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          />
+                          <CheckCircle
+                            size={18}
+                            onClick={() => handleSaveAddress(job.id)}
+                            style={{ cursor: 'pointer', color: '#10b981' }}
+                          />
+                          <XCircle
+                            size={18}
+                            onClick={handleCancelAddressEdit}
+                            style={{ cursor: 'pointer', color: '#ef4444' }}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <a href={`https://maps.google.com/?q=${encodeURIComponent(job.serviceAddress)}`}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             style={{ color: '#4f46e5', textDecoration: 'none' }}>
+                            {job.serviceAddress}
+                          </a>
+                          <Edit2
+                            size={14}
+                            onClick={() => handleEditAddress(job)}
+                            style={{ cursor: 'pointer', color: '#4f46e5', flexShrink: 0 }}
+                          />
+                        </>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -8296,19 +8387,10 @@ const ContractorDashboard: React.FC = () => {
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
                   Service Address *
                 </label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={addJobForm.address}
-                  onChange={(e) => setAddJobForm({ ...addJobForm, address: e.target.value })}
-                  placeholder="1234 Main St, Boise, ID"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
+                  onChange={(value) => setAddJobForm({ ...addJobForm, address: value })}
+                  placeholder="Start typing an address..."
                 />
               </div>
 

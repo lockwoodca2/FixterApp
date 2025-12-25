@@ -794,6 +794,75 @@ bookings.patch('/bookings/:id/schedule', async (c) => {
   }
 });
 
+// PATCH /api/bookings/:id/address - Update booking service address
+bookings.patch('/bookings/:id/address', async (c) => {
+  try {
+    const prisma = c.get('prisma');
+    const { id } = c.req.param();
+    const { serviceAddress } = await c.req.json();
+
+    if (!serviceAddress || !serviceAddress.trim()) {
+      return c.json({
+        success: false,
+        error: 'Service address is required'
+      }, 400);
+    }
+
+    // Get existing booking
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingBooking) {
+      return c.json({
+        success: false,
+        error: 'Booking not found'
+      }, 404);
+    }
+
+    // Update booking address
+    const booking = await prisma.booking.update({
+      where: { id: parseInt(id) },
+      data: {
+        serviceAddress: serviceAddress.trim()
+      },
+      include: {
+        contractor: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        service: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
+    });
+
+    return c.json({
+      success: true,
+      booking,
+      message: 'Booking address updated successfully'
+    });
+  } catch (error) {
+    console.error('Update booking address error:', error);
+    return c.json({
+      success: false,
+      error: 'Failed to update booking address'
+    }, 500);
+  }
+});
+
 // POST /api/bookings/:id/complete - Mark job as complete with details and generate invoice
 bookings.post('/bookings/:id/complete', async (c) => {
   try {
