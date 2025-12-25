@@ -790,10 +790,34 @@ profiles.get('/booking-page/:slug/availability', async (c) => {
       }
     });
 
+    // Get contractor's service areas (global list)
+    const contractorServiceAreas = await prisma.contractorServiceArea.findMany({
+      where: {
+        contractorId: contractor.id,
+        isActive: true
+      }
+    });
+
+    // Extract unique service areas
+    const serviceAreas = [...new Set(contractorServiceAreas.map((sa: any) => sa.area))];
+
+    // Group service areas by day of week
+    const serviceAreasByDay: { [key: number]: string[] } = {};
+    contractorServiceAreas.forEach((sa: any) => {
+      if (!serviceAreasByDay[sa.dayOfWeek]) {
+        serviceAreasByDay[sa.dayOfWeek] = [];
+      }
+      if (!serviceAreasByDay[sa.dayOfWeek].includes(sa.area)) {
+        serviceAreasByDay[sa.dayOfWeek].push(sa.area);
+      }
+    });
+
     return c.json({
       success: true,
       contractorId: contractor.id,
-      availability
+      availability,
+      serviceAreas,
+      serviceAreasByDay
     });
   } catch (error) {
     console.error('Get booking page availability error:', error);

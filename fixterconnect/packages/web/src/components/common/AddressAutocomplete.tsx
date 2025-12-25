@@ -4,6 +4,8 @@ import React, { useEffect, useRef } from 'react';
 declare global {
   interface Window {
     google: any;
+    googleMapsLoaded: boolean;
+    googleMapsCallbacks: (() => void)[];
   }
 }
 
@@ -24,6 +26,52 @@ interface AddressAutocompleteProps {
   onKeyDown?: (e: React.KeyboardEvent) => void;
 }
 
+// Load Google Maps script dynamically
+const loadGoogleMapsScript = (): Promise<void> => {
+  return new Promise((resolve) => {
+    // Already loaded
+    if (window.google?.maps?.places) {
+      resolve();
+      return;
+    }
+
+    // Script is loading, add callback
+    if (window.googleMapsCallbacks) {
+      window.googleMapsCallbacks.push(resolve);
+      return;
+    }
+
+    // Initialize callback array
+    window.googleMapsCallbacks = [resolve];
+
+    // Get API key from environment variable
+    const apiKey = process.env.REACT_APP_GOOGLE_PLACES_API_KEY;
+
+    if (!apiKey) {
+      console.warn('Google Places API key not configured. Address autocomplete will not work.');
+      return;
+    }
+
+    // Create and append script
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      window.googleMapsLoaded = true;
+      window.googleMapsCallbacks.forEach(cb => cb());
+      window.googleMapsCallbacks = [];
+    };
+
+    script.onerror = () => {
+      console.error('Failed to load Google Maps script');
+    };
+
+    document.head.appendChild(script);
+  });
+};
+
 const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   value,
   onChange,
@@ -37,11 +85,10 @@ const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   const autocompleteRef = useRef<any>(null);
 
   useEffect(() => {
-    // Wait for Google Maps to load
-    const initAutocomplete = () => {
-      if (!window.google || !window.google.maps || !window.google.maps.places) {
-        // Retry after a short delay if Google Maps isn't loaded yet
-        setTimeout(initAutocomplete, 100);
+    const initAutocomplete = async () => {
+      await loadGoogleMapsScript();
+
+      if (!window.google?.maps?.places) {
         return;
       }
 

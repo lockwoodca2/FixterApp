@@ -16,6 +16,7 @@ import {
 } from 'react-feather';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/api';
+import AddressAutocomplete from '../components/common/AddressAutocomplete';
 
 // Helper to get local date string in YYYY-MM-DD format
 const getLocalDateString = (date: Date = new Date()) => {
@@ -89,6 +90,11 @@ const BookingPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  // Service area state
+  const [serviceAreas, setServiceAreas] = useState<string[]>([]);
+  const [serviceAreasByDay, setServiceAreasByDay] = useState<{ [key: number]: string[] }>({});
+  const [serviceAreaWarning, setServiceAreaWarning] = useState<string | null>(null);
+
   // Inline auth form state
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
@@ -147,7 +153,9 @@ const BookingPage: React.FC = () => {
         if (availResponse.ok) {
           const availData = await availResponse.json();
           if (availData.success) {
-            setAvailabilityData(availData.availabilities || []);
+            setAvailabilityData(availData.availability || []);
+            setServiceAreas(availData.serviceAreas || []);
+            setServiceAreasByDay(availData.serviceAreasByDay || {});
           }
         }
       } else {
@@ -194,6 +202,54 @@ const BookingPage: React.FC = () => {
 
     setAvailableTimeSlots(slots);
   };
+
+  // Validate service area when address or date changes
+  useEffect(() => {
+    if (!serviceAddress || serviceAddress.length < 5) {
+      setServiceAreaWarning(null);
+      return;
+    }
+
+    const addressLower = serviceAddress.toLowerCase();
+
+    // Check against global service areas first
+    if (serviceAreas.length > 0) {
+      const inGlobalArea = serviceAreas.some(area =>
+        addressLower.includes(area.toLowerCase())
+      );
+
+      if (!inGlobalArea) {
+        setServiceAreaWarning(
+          `This address may be outside the contractor's service areas (${serviceAreas.join(', ')}). You can still request a booking, but it may not be accepted.`
+        );
+        return;
+      }
+    }
+
+    // Check day-specific service areas if a date is selected
+    if (selectedDate && Object.keys(serviceAreasByDay).length > 0) {
+      const jobDate = new Date(selectedDate + 'T00:00:00');
+      const dayOfWeek = jobDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const dayAreas = serviceAreasByDay[dayOfWeek];
+
+      if (dayAreas && dayAreas.length > 0) {
+        const inDayArea = dayAreas.some(area =>
+          addressLower.includes(area.toLowerCase())
+        );
+
+        if (!inDayArea) {
+          const dayNames = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+          setServiceAreaWarning(
+            `On ${dayNames[dayOfWeek]}, this contractor only services: ${dayAreas.join(', ')}. Your address may be outside their service area for this day.`
+          );
+          return;
+        }
+      }
+    }
+
+    // All checks passed
+    setServiceAreaWarning(null);
+  }, [serviceAddress, selectedDate, serviceAreas, serviceAreasByDay]);
 
   const handleBookService = (serviceId: string) => {
     setSelectedService(serviceId);
@@ -732,14 +788,26 @@ const BookingPage: React.FC = () => {
                       <MapPin className="w-4 h-4 inline-block mr-1" />
                       Service Address
                     </label>
-                    <input
-                      type="text"
+                    <AddressAutocomplete
                       value={serviceAddress}
-                      onChange={(e) => setServiceAddress(e.target.value)}
-                      placeholder="Enter your address"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
+                      onChange={(value) => setServiceAddress(value)}
+                      placeholder="Start typing your address..."
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
                     />
+                    {serviceAreaWarning && (
+                      <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800 flex items-start gap-2">
+                          <span className="text-yellow-500 mt-0.5">⚠️</span>
+                          {serviceAreaWarning}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div>

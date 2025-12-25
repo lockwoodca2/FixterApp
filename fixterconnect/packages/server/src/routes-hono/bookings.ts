@@ -98,6 +98,49 @@ bookings.post('/bookings', async (c) => {
       }, 404);
     }
 
+    // Check service area (soft validation - returns warning but allows booking)
+    const addressLower = serviceAddress.toLowerCase();
+    const jobDate = new Date(scheduledDate);
+    const dayOfWeek = jobDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    // Get contractor's service areas
+    const contractorServiceAreas = await prisma.contractorServiceArea.findMany({
+      where: {
+        contractorId,
+        isActive: true
+      }
+    });
+
+    let serviceAreaWarning: string | null = null;
+
+    if (contractorServiceAreas.length > 0) {
+      // Check global service areas
+      const allAreas = [...new Set(contractorServiceAreas.map((sa: any) => sa.area))];
+      const inGlobalArea = allAreas.some((area: string) =>
+        addressLower.includes(area.toLowerCase())
+      );
+
+      if (!inGlobalArea) {
+        serviceAreaWarning = `Address may be outside contractor's service areas (${allAreas.join(', ')})`;
+      } else {
+        // Check day-specific service areas
+        const dayAreas = contractorServiceAreas
+          .filter((sa: any) => sa.dayOfWeek === dayOfWeek)
+          .map((sa: any) => sa.area);
+
+        if (dayAreas.length > 0) {
+          const inDayArea = dayAreas.some((area: string) =>
+            addressLower.includes(area.toLowerCase())
+          );
+
+          if (!inDayArea) {
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            serviceAreaWarning = `On ${dayNames[dayOfWeek]}s, contractor only services: ${dayAreas.join(', ')}`;
+          }
+        }
+      }
+    }
+
     // Parse scheduledTime to get start time (e.g., "09:00 - 11:30" -> "09:00")
     const startTime = scheduledTime.split(' - ')[0] || scheduledTime;
 
@@ -188,7 +231,8 @@ bookings.post('/bookings', async (c) => {
     return c.json({
       success: true,
       booking,
-      message: 'Booking and time slots created successfully'
+      message: 'Booking and time slots created successfully',
+      serviceAreaWarning
     }, 201);
   } catch (error) {
     console.error('Create booking error:', error);
